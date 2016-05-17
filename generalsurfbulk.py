@@ -45,6 +45,7 @@ mesh.Curve(order)
 # inside the bulk:
 VL = H1(mesh, order=order)
 VP = H1(mesh, order=order)
+VExt = H1(mesh, order=order, dirichlet=[1,2])
 # on the surface:
 Vl = H1(mesh, order=order, flags={"definedon": [], "definedonbound": [1, 2], "dirichlet": [1, 2]})
 Vp = H1(mesh, order=order, flags={"definedon": [], "definedonbound": [2], "dirichlet": [2]})
@@ -112,8 +113,15 @@ for i in range(fes.ndof):
 invmat = mstar.Inverse(alldofs)
 rhs = s.vec.CreateVector()
 
-Draw(s.components[3], mesh, "p")
-Draw(s.components[2], mesh, "l")
+ext_p = GridFunction(VExt)
+ext_l = GridFunction(VExt)
+
+ext_l.Set(s.components[2],boundary=True)
+ext_p.Set(s.components[3],boundary=True)
+
+Draw(ext_p, mesh, "ext_p")
+Draw(ext_l, mesh, "ext_l")
+
 Draw(s.components[1], mesh, "P")
 Draw(s.components[0], mesh, "L")
 
@@ -126,5 +134,7 @@ while t < tend:
     rhs.data = c.mat * s.vec
     s.vec.data = invmat * rhs
 
+    ext_l.Set(s.components[2],boundary=True)
+    ext_p.Set(s.components[3],boundary=True)
     t += tau
     Redraw(blocking=True)
