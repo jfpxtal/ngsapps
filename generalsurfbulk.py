@@ -39,6 +39,7 @@ def MyCircle (geo, c, r, **args):
 circ = SplineGeometry()
 MyCircle(circ, (0,0), 1)
 mesh = Mesh(circ.GenerateMesh(maxh=0.2))
+mesh.Curve(order)
 
 # H1-conforming finite element spaces
 # inside the bulk:
