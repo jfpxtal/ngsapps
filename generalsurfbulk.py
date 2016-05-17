@@ -11,21 +11,24 @@ order = 3
 
 # time step and end
 tau = 1e-2
-tend = 1.0
+tend = 3.0
 
 # model parameters
-dL = 1
-dP = 1
-dl = 1
-dp = 1
+# diffusion rates
+dL = 0.01
+dP = 0.02
+# surface diffusion rates
+dl = 0.02
+dp = 0.04
+# reaction rates
 alpha = 1
-beta = 1
-gamma = 1
-eta = 1
-kappa = 1
-lamdba = 1
+beta = 2
+gamma = 2
+lamdba = 4
+sigma = 3
 xi = 1
-sigma = 1
+kappa = 2.5
+eta = (alpha * xi * sigma * lamdba) / (beta * gamma * kappa)
 
 def MyCircle (geo, c, r, **args):
     cx,cy = c
@@ -38,7 +41,7 @@ def MyCircle (geo, c, r, **args):
 # geometry and mesh
 circ = SplineGeometry()
 MyCircle(circ, (0,0), 1)
-mesh = Mesh(circ.GenerateMesh(maxh=0.2))
+mesh = Mesh(circ.GenerateMesh(maxh=0.1))
 mesh.Curve(order)
 
 # H1-conforming finite element spaces
@@ -75,18 +78,18 @@ a = BilinearForm (fes, symmetric=True)
 a += SymbolicBFI(dL * gradL * gradtL)
 a += SymbolicBFI(dP * gradP * gradtP)
 a += SymbolicBFI(dl * gradl * gradtl, BND)
-a += SymbolicBFI(dp * gradp * gradtp, BND, definedon=[2]) # !!!!!!!!!!!!!!!!!!!!
+a += SymbolicBFI(dp * gradp * gradtp, BND, definedon=[1])
 a += SymbolicBFI((beta * L - alpha * P) * (tL - tP))
 a += SymbolicBFI((lamdba * L - gamma * l) * (tL - tl), BND)
-a += SymbolicBFI((eta * P - xi * p) * (tP - tp), BND, definedon=[2]) # !!!!!!
-a += SymbolicBFI((sigma * l - kappa * p) * (tl - tp), BND, definedon=[2]) # !!!!!!!!
+a += SymbolicBFI((eta * P - xi * p) * (tP - tp), BND, definedon=[1])
+a += SymbolicBFI((sigma * l - kappa * p) * (tl - tp), BND, definedon=[1])
 
 # second bilinear form
 c = BilinearForm(fes, symmetric=True)
 c += SymbolicBFI(L * tL)
 c += SymbolicBFI(P * tP)
 c += SymbolicBFI(l * tl, BND)
-c += SymbolicBFI(p * tp, BND, definedon=[2]) # !!!!!!!!!!
+c += SymbolicBFI(p * tp, BND, definedon=[1])
 
 a.Assemble()
 c.Assemble()
@@ -106,11 +109,7 @@ s.components[3].Set(0.4 * y + 1, boundary=True)
 mstar = a.mat.CreateMatrix()
 mstar.AsVector().data = c.mat.AsVector() + tau * a.mat.AsVector()
 
-alldofs = BitArray(fes.ndof)
-for i in range(fes.ndof):
-    alldofs.Set(i)
-
-invmat = mstar.Inverse(alldofs)
+invmat = mstar.Inverse()
 rhs = s.vec.CreateVector()
 
 ext_p = GridFunction(VExt)
