@@ -30,6 +30,8 @@ xi = 1
 kappa = 2.5
 eta = (alpha * xi * sigma * lamdba) / (beta * gamma * kappa)
 
+vtkoutput = False
+
 def MyCircle (geo, c, r, **args):
     cx,cy = c
     pts = [geo.AppendPoint(*p) for p in [(cx,cy-r), (cx+r,cy-r), (cx+r,cy), (cx+r,cy+r), \
@@ -41,7 +43,7 @@ def MyCircle (geo, c, r, **args):
 # geometry and mesh
 circ = SplineGeometry()
 MyCircle(circ, (0,0), 1)
-mesh = Mesh(circ.GenerateMesh(maxh=0.1))
+mesh = Mesh(circ.GenerateMesh(maxh=0.2))
 mesh.Curve(order)
 
 # H1-conforming finite element spaces
@@ -74,7 +76,7 @@ gradtl = tl.Trace().Deriv()
 gradtp = tp.Trace().Deriv()
 
 # first bilinear form
-a = BilinearForm (fes, symmetric=True)
+a = BilinearForm (fes, symmetric=False)
 a += SymbolicBFI(dL * gradL * gradtL)
 a += SymbolicBFI(dP * gradP * gradtP)
 a += SymbolicBFI(dl * gradl * gradtl, BND)
@@ -85,7 +87,7 @@ a += SymbolicBFI((eta * P - xi * p) * (tP - tp), BND, definedon=[1])
 a += SymbolicBFI((sigma * l - kappa * p) * (tl - tp), BND, definedon=[1])
 
 # second bilinear form
-c = BilinearForm(fes, symmetric=True)
+c = BilinearForm(fes, symmetric=False)
 c += SymbolicBFI(L * tL)
 c += SymbolicBFI(P * tP)
 c += SymbolicBFI(l * tl, BND)
@@ -124,8 +126,27 @@ Draw(ext_l, mesh, "ext_l")
 Draw(s.components[1], mesh, "P")
 Draw(s.components[0], mesh, "L")
 
-# implicit Euler
+if vtkoutput:
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[1],s.components[0]],names=["P","L"],filename="generalsurfacebulk_",subdivision=3)
+    vtk.Do()
+
 t = 0.0
+
+bulkconcL = []
+bulkconcP = []
+surfconcL = []
+surfconcP = []
+sumconc = []
+times = []
+
+bulkconcL.append(Integrate(s.components[0],mesh,VOL))
+bulkconcP.append(Integrate(s.components[1],mesh,VOL))
+surfconcL.append(Integrate(s.components[2],mesh,BND))
+surfconcP.append(Integrate(s.components[3],mesh,BND))
+sumconc.append(bulkconcL[-1]+bulkconcP[-1]+surfconcL[-1]+surfconcP[-1])
+times.append(t)
+
+# implicit Euler
 while t < tend:
     print("t=", t)
     input("")
@@ -137,3 +158,27 @@ while t < tend:
     ext_p.Set(s.components[3],boundary=True)
     t += tau
     Redraw(blocking=True)
+    if vtkoutput:
+        vtk.Do()
+
+    bulkconcL.append(Integrate(s.components[0],mesh,VOL))
+    bulkconcP.append(Integrate(s.components[1],mesh,VOL))
+    surfconcL.append(Integrate(s.components[2],mesh,BND))
+    surfconcP.append(Integrate(s.components[3],mesh,BND))
+    sumconc.append(bulkconcL[-1]+bulkconcP[-1]+surfconcL[-1]+surfconcP[-1])
+    times.append(t)
+
+import matplotlib.pyplot as plt
+plt.figure(0)
+# plt.yscale('log')
+plt.xlabel("time")
+plt.plot(times,bulkconcL,'8-')
+plt.plot(times,bulkconcP,'8-')
+plt.plot(times,surfconcL,'8-')
+plt.plot(times,surfconcP,'8-')
+plt.plot(times,sumconc,'8-')
+plt.legend(["bulk concentration L","bulk concentration P","surface concentration L","surface concentration P","total concentration"])
+plt.ion()
+plt.show()
+
+
