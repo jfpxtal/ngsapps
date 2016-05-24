@@ -4,13 +4,13 @@ import random
 
 order = 3
 
-tau = 5e-6
+tau = 1e-5
 tend = 3
 
 lamdba = 1e-2
 M = 1
 
-mesh = Mesh(unit_square.GenerateMesh(maxh=0.3))
+mesh = Mesh(unit_square.GenerateMesh(maxh=0.1))
 
 V1 = H1(mesh, order=order) # , dirichlet=[1,2,3,4])
 V2 = H1(mesh, order=order) #, dirichlet=[1,2,3,4])
@@ -22,7 +22,7 @@ print("b")
 a = BilinearForm(fes)
 a += SymbolicBFI(tau * M * grad(mu) * grad(q))
 a += SymbolicBFI(mu * v)
-a += SymbolicBFI(-200 * (c - 2 * c * c * c) * v)
+a += SymbolicBFI(-200 * (c - 3 * c * c + 2 * c * c * c) * v)
 a += SymbolicBFI(-lamdba * grad(c) * grad(v))
 
 b = BilinearForm(fes)
@@ -35,29 +35,44 @@ mstar = b.mat.CreateMatrix()
 s = GridFunction(fes)
 print("d")
 # initial conditions
-s.components[0].Set(x - x + 0.63 + 0.02 * (0.5 - random.random()))
+### TODO
+# s.components[0].Set(sin(3*x)*cos(4*y))
+s.components[0].Set(0.5+0.5*sin(4e6*(x*x-0.5*y))*sin(5e6*(y*y-0.5*x)))
+# s.components[0].Set(x - x + 0.63 + 0.02 * (0.5 - random.random()))
 print("e")
-s.components[1].Set(x - x)
+s.components[1].Set(CoefficientFunction(0.0))
 
 rhs = s.vec.CreateVector()
+sold = s.vec.CreateVector()
+As = s.vec.CreateVector()
+w = s.vec.CreateVector()
 
 Draw(s.components[1], mesh, "mu")
 Draw(s.components[0], mesh, "c")
 
+input("")
 # implicit Euler
 print("a")
 t = 0.0
 while t < tend:
-    print("\r t = {:10.6e}".format(t),end="")
-    input("")
+    print("t = {:10.6e}".format(t))#,end="")
 
-    rhs.data = b.mat * s.vec
-    a.AssembleLinearization(rhs)
+    sold.data = s.vec
+    wnorm = 1e99
 
-    mstar.AsVector().data = b.mat.AsVector() + a.mat.AsVector()
-    invmat = mstar.Inverse()
+    while wnorm > 1e-9:
+        rhs.data = b.mat * sold 
+        rhs.data -= b.mat * s.vec
+        a.Apply(s.vec,As)
+        rhs.data -= As
+        a.AssembleLinearization(s.vec)
 
-    s.vec.data = invmat * rhs
+        mstar.AsVector().data = b.mat.AsVector() + a.mat.AsVector()
+        invmat = mstar.Inverse()
+        w.data = invmat * rhs
+        wnorm = w.Norm()
+        print("|w| = {:7.3e}".format(wnorm),end="")
+        s.vec.data += w
 
     t += tau
     Redraw(blocking=True)
