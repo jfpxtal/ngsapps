@@ -178,7 +178,6 @@ plt.plot(times,surfconcL,'8-')
 plt.plot(times,surfconcP,'8-')
 plt.plot(times,sumconc,'8-')
 plt.legend(["bulk concentration L","bulk concentration P","surface concentration L","surface concentration P","total concentration"])
-plt.ion()
 plt.show()
 
 

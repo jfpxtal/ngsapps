@@ -48,14 +48,14 @@ gradl = l.Trace().Deriv()
 gradw = w.Trace().Deriv()
 
 # first bilinear form
-a = BilinearForm (fes, symmetric=True)
+a = BilinearForm (fes, symmetric=False)
 a += SymbolicBFI(dL * gradL * gradv)
 # boundary terms
 a += SymbolicBFI(dl * gradl * gradw, BND)
 a += SymbolicBFI((lamdba * L - gamma * l) * (v - w), BND)
 
 # second bilinear form
-c = BilinearForm(fes, symmetric=True)
+c = BilinearForm(fes, symmetric=False)
 c += SymbolicBFI(L * v)
 # boundary term
 c += SymbolicBFI(l * w, BND)
