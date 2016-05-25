@@ -55,7 +55,7 @@ a += SymbolicBFI(dl * gradl * gradw, BND)
 a += SymbolicBFI((lamdba * L - gamma * l) * (v - w), BND)
 
 # second bilinear form
-c = BilinearForm(fes, symmetric=False)
+c = BilinearForm(fes, symmetric=True)
 c += SymbolicBFI(L * v)
 # boundary term
 c += SymbolicBFI(l * w, BND)
