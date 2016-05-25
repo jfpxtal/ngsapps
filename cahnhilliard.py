@@ -37,7 +37,9 @@ s = GridFunction(fes)
 # initial conditions
 ### TODO
 # s.components[0].Set(sin(3*x)*cos(4*y))
-s.components[0].Set(0.5+0.5*sin(4e6*(x*x-0.5*y))*sin(5e6*(y*y-0.5*x)))
+for i in range(len(s.components[0].vec)):
+    s.components[0].vec[i]=0.63 + 0.02 * (0.5 - random.random())
+# s.components[0].Set(0.5+0.5*sin(4e6*(x*x-0.5*y))*sin(5e6*(y*y-0.5*x)))
 # s.components[0].Set(x - x + 0.63 + 0.02 * (0.5 - random.random()))
 s.components[1].Set(CoefficientFunction(0.0))
 
@@ -51,7 +53,6 @@ Draw(s.components[0], mesh, "c")
 
 input("")
 # implicit Euler
-print("a")
 t = 0.0
 while t < tend:
     print("t = {:10.6e}".format(t))#,end="")
