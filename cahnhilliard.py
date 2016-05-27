@@ -4,18 +4,46 @@ import random
 
 order = 3
 
+initial_roughness = 20.0
+
 tau = 1e-5
 tend = 3
 
 lamdba = 1e-2
 M = 1
 
+def sqr(x):
+    return x * x
+
+# add gaussians with random positions and widths until we reach total mass >= 0.5
+def set_initial_conditions(result_gridfunc):
+    c0 = GridFunction(result_gridfunc.space)
+    total_mass = 0.0
+    vec_storage = c0.vec.CreateVector()
+    vec_storage[:] = 0.0
+
+    print("setting initial conditions")
+    while total_mass < 0.5:
+        print("\rtotal mass = {:10.6e}".format(total_mass), end="")
+        center_x = random.random()
+        center_y = random.random()
+        thinness_x = initial_roughness * (1+random.random())
+        thinness_y = initial_roughness * (1+random.random())
+        c0.Set(exp(-(sqr(thinness_x) * sqr(x-center_x) + sqr(thinness_y) * sqr(y-center_y))))
+        vec_storage.data += c0.vec
+        c0.vec.data = vec_storage
+
+        # cut off above 1.0
+        result_gridfunc.Set(IfPos(c0-1.0,1.0,c0))
+        total_mass = Integrate(s.components[0],mesh,VOL)
+
+    print()
+
+
 mesh = Mesh(unit_square.GenerateMesh(maxh=0.1))
 
-V1 = H1(mesh, order=order) # , dirichlet=[1,2,3,4])
-V2 = H1(mesh, order=order) #, dirichlet=[1,2,3,4])
-
-fes = FESpace([V1, V2])
+V = H1(mesh, order=order)
+fes = FESpace([V, V])
 c, mu = fes.TrialFunction()
 q, v = fes.TestFunction()
 
@@ -34,13 +62,7 @@ mstar = b.mat.CreateMatrix()
 
 s = GridFunction(fes)
 
-# initial conditions
-### TODO
-# s.components[0].Set(sin(3*x)*cos(4*y))
-for i in range(len(s.components[0].vec)):
-    s.components[0].vec[i]=0.63 + 0.02 * (0.5 - random.random())
-# s.components[0].Set(0.5+0.5*sin(4e6*(x*x-0.5*y))*sin(5e6*(y*y-0.5*x)))
-# s.components[0].Set(x - x + 0.63 + 0.02 * (0.5 - random.random()))
+set_initial_conditions(s.components[0])
 s.components[1].Set(CoefficientFunction(0.0))
 
 rhs = s.vec.CreateVector()
@@ -51,15 +73,16 @@ w = s.vec.CreateVector()
 Draw(s.components[1], mesh, "mu")
 Draw(s.components[0], mesh, "c")
 
-input("")
+input("Press any key...")
 # implicit Euler
 t = 0.0
 while t < tend:
-    print("t = {:10.6e}".format(t))#,end="")
+    print("\n\nt = {:10.6e}".format(t))
 
     sold.data = s.vec
     wnorm = 1e99
 
+    # newton solver
     while wnorm > 1e-9:
         rhs.data = b.mat * sold
         rhs.data -= b.mat * s.vec
@@ -71,8 +94,8 @@ while t < tend:
         invmat = mstar.Inverse()
         w.data = invmat * rhs
         wnorm = w.Norm()
-        print("|w| = {:7.3e}".format(wnorm),end="")
+        print("|w| = {:7.3e} ".format(wnorm),end="")
         s.vec.data += w
 
     t += tau
-    Redraw(blocking=True)
+    Redraw(blocking=False)
