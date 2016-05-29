@@ -1,10 +1,11 @@
+# http://www.math.umn.edu/~scheel/preprints/pf0.pdf
+
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as splinalg
 import matplotlib.pyplot as plt
 
 np.set_printoptions(linewidth=200)
-outfile = open("precip.bin", "wb")
 
 # L = 10
 # N = 10
@@ -21,6 +22,10 @@ alpha = 0.2
 kappa = 0
 
 delta = 0.1
+
+output = True
+if output:
+    outfile = open("precip.bin", "wb")
 
 diag = np.hstack((1, np.full(N - 1, dx ** 2 / dt + 2 + gamma), 1,
              1, np.full(N - 1, dx ** 2 / dt + 2 * kappa), 1))
@@ -39,15 +44,18 @@ print(M.toarray())
 def AApply(u):
     v = u[N + 2:-1]
     w = v * (1 - v) * (v - alpha)
+    # print(dx ** 2 * dt * np.hstack((0, w, 0, 0, -w, 0)))
     return dx ** 2 * dt * np.hstack((0, w, 0, 0, -w, 0))
 
 def AssembleLinearization(u):
     rightm = sp.dia_matrix((np.hstack((0, -3 * u[N + 2:-1] ** 2 + 2 * (1 + alpha) * u[N + 2:-1] - alpha, 0)), 0), (N + 1, N + 1))
     Alin = sp.bmat([[sp.coo_matrix((N + 1, N + 1)), rightm], [None, -rightm]])
+    # print(dx ** 2 * dt * Alin.toarray())
     return dx ** 2 * dt * Alin
 
 
 s = np.hstack((np.full(10 / dx, delta), np.full(10 / dx, -delta), np.zeros(N + 1 - 20 / dx), np.full(N + 1, alpha)))
+# s = np.hstack((np.full(1 / dx, delta), np.full(1 / dx, -delta), np.zeros(N + 1 - 2 / dx), np.full(N + 1, alpha)))
 
 
 xs = np.linspace(0, L, num=N + 1)
@@ -95,7 +103,8 @@ while t <= tend:
         ax_mass.autoscale_view()
         fig_sol.canvas.draw()
         fig_mass.canvas.draw()
-        np.save(outfile, s)
+        if output:
+            np.save(outfile, s)
 
     sold = np.copy(s)
     wnorm = 1e99
@@ -118,5 +127,6 @@ while t <= tend:
     it += 1
 
 print()
-outfile.close()
+if output:
+    outfile.close()
 plt.show()
