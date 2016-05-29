@@ -13,8 +13,8 @@ N = 7000
 dx = L / N
 
 dt = 0.05
-# tend = 4000
-tend = 1000
+tend = 4000
+# tend = 1000
 
 gamma = 0.1
 alpha = 0.2
@@ -24,8 +24,8 @@ delta = 0.1
 
 diag = np.hstack((1, np.full(N - 1, dx ** 2 / dt + 2 + gamma), 1,
              1, np.full(N - 1, dx ** 2 / dt + 2 * kappa), 1))
-upper_minor = np.hstack((0, -np.ones(N), np.full(N + 1, -kappa)))
-lower_minor = np.hstack((-np.ones(N), np.full(N, -kappa), -1, 0))
+upper_minor = np.hstack((0, -np.ones(N), 0, -1, np.full(N - 1, -kappa)))
+lower_minor = np.hstack((-np.ones(N), 0, np.full(N - 1, -kappa), -1, 0))
 B = sp.dia_matrix((np.vstack((lower_minor, diag, upper_minor)), [-1, 0, 1]), (2 * N + 2, 2 * N + 2))
 B *= dt
 
@@ -46,25 +46,55 @@ def AssembleLinearization(u):
     Alin = sp.bmat([[sp.coo_matrix((N + 1, N + 1)), rightm], [None, -rightm]])
     return dx ** 2 * dt * Alin
 
-s = np.hstack((np.full(10 / dx, 20), np.full(10 / dx, -10), np.zeros(N + 1 - 20 / dx), np.full(N + 1, alpha)))
 
-fig = plt.figure()
+s = np.hstack((np.full(10 / dx, delta), np.full(10 / dx, -delta), np.zeros(N + 1 - 20 / dx), np.full(N + 1, alpha)))
+
+
 xs = np.linspace(0, L, num=N + 1)
+ts = np.array([0])
+
+fig_sol = plt.figure()
+
+ax_e = fig_sol.add_subplot(211)
+line_e, = ax_e.plot(xs, s[N + 1:], "b", label="e")
+ax_e.legend()
+
+ax_c = fig_sol.add_subplot(212)
+line_c, = ax_c.plot(xs, s[:N + 1], "b", label="c")
+ax_c.legend()
+
+fig_mass = plt.figure()
+ax_mass = fig_mass.add_subplot(111)
+masses = np.array([s.sum()])
+line_mass, = ax_mass.plot(ts, masses, "g", label=r"$\int\;c + e$")
+ax_mass.legend()
+
+plt.show(block=False)
 
 input("Press any key...")
 # implicit Euler
 t = 0.0
-it = 0
-while t < tend:
-    it += 1
-    print("\n\nt = {:10.6e}".format(t))
-    if it % 200 == 0:
+it = 1
+while t <= tend:
+    print("\n\nt = {:10.2f}".format(t))
+    # if it % 200 == 0:
+    if it % 100 == 0:
         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        fig.clear()
-        plt.plot(xs, s[N + 1:])
-        # plt.plot(xs, s[:N+1])
-        plt.pause(0.05)
-        # plt.show(block=False)
+        print("mass = " + str(s.sum()))
+        line_e.set_ydata(s[N + 1:])
+        line_c.set_ydata(s[:N + 1])
+        ax_e.relim()
+        ax_e.autoscale_view()
+        ax_c.relim()
+        ax_c.autoscale_view()
+        ts = np.append(ts, t)
+        masses = np.append(masses, s.sum())
+        line_mass.set_xdata(ts)
+        line_mass.set_ydata(masses)
+        ax_mass.relim()
+        ax_mass.autoscale_view()
+        fig_sol.canvas.draw()
+        fig_mass.canvas.draw()
         np.save(outfile, s)
 
     sold = np.copy(s)
@@ -85,6 +115,8 @@ while t < tend:
         s += w
 
     t += dt
+    it += 1
 
+print()
 outfile.close()
 plt.show()
