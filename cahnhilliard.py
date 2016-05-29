@@ -12,6 +12,8 @@ tend = 3
 lamdba = 1e-2
 M = 1
 
+vtkoutput = False
+
 def sqr(x):
     return x * x
 
@@ -73,6 +75,10 @@ w = s.vec.CreateVector()
 Draw(s.components[1], mesh, "mu")
 Draw(s.components[0], mesh, "c")
 
+if vtkoutput:
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[1],s.components[0]],names=["mu","c"],filename="cahnhilliard_",subdivision=3)
+    vtk.Do()
+
 input("Press any key...")
 # implicit Euler
 t = 0.0
@@ -99,3 +105,5 @@ while t < tend:
 
     t += tau
     Redraw(blocking=False)
+    if vtkoutput:
+        vtk.Do()
