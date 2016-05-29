@@ -110,7 +110,7 @@ while t <= tend:
     wnorm = 1e99
 
     rhs1 = dx ** 2 * np.hstack((0, sold[1:N], 0, 0, sold[N + 2:-1], 0))
-    # newton solver
+    # Newton solver
     while wnorm > 1e-9:
         rhs = np.copy(rhs1)
         rhs -= M.dot(s)

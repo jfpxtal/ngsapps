@@ -1,6 +1,7 @@
 # http://www.math.umn.edu/~scheel/preprints/pf0.pdf
 
 from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
+from netgen.geom2d import SplineGeometry
 from netgen.csg import Pnt
 from ngsolve import *
 import matplotlib.pyplot as plt
@@ -21,6 +22,12 @@ alpha = 0.2
 kappa = 0
 
 vtkoutput = False
+
+visgeo = SplineGeometry()
+visgeo.AddRectangle((0,0), (700,10))
+vismesh = Mesh(visgeo.GenerateMesh(maxh=5))
+
+visV = H1(vismesh, order=order)
 
 netmesh = NetMesh()
 netmesh.dim = 1
@@ -69,9 +76,6 @@ sold = s.vec.CreateVector()
 As = s.vec.CreateVector()
 w = s.vec.CreateVector()
 
-Draw(s.components[0], mesh, "c")
-Draw(s.components[1], mesh, "e")
-
 if vtkoutput:
     vtk = VTKOutput(ma=mesh,coefs=[s.components[1],s.components[0]],names=["e","c"],filename="precipitation_",subdivision=3)
     vtk.Do()
@@ -100,14 +104,21 @@ ax_mass.legend()
 
 plt.show(block=False)
 
+visfun = GridFunction(visV)
+visfun.Set(s.components[1])
+Draw(visfun, vismesh, "e")
+
+
 input("Press any key...")
 # implicit Euler
 t = 0.0
 it = 1
 while t < tend:
-    print("\n\nt = {:10.6e}".format(t))
+    print("\n\nt = {:10.2f}".format(t))
     if it % 100 == 0:
         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+
+        visfun.Set(s.components[1])
         line_e.set_ydata(get_vals(s.components[1]))
         line_c.set_ydata(get_vals(s.components[0]))
         ax_e.relim()
@@ -143,6 +154,6 @@ while t < tend:
 
     t += tau
     it += 1
-    # Redraw(blocking=False)
+    Redraw(blocking=False)
     if vtkoutput:
         vtk.Do()
