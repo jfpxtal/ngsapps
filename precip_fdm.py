@@ -27,14 +27,15 @@ output = True
 if output:
     outfile = open("precip.bin", "wb")
 
-diag = np.hstack((1, np.full(N - 1, dx ** 2 / dt + 2 + gamma), 1,
-             1, np.full(N - 1, dx ** 2 / dt + 2 * kappa), 1))
-upper_minor = np.hstack((0, -np.ones(N), 0, -1, np.full(N - 1, -kappa)))
-lower_minor = np.hstack((-np.ones(N), 0, np.full(N - 1, -kappa), -1, 0))
+# kappa == 0
+diag = np.hstack((1 + dx ** 2 / dt + gamma, np.full(N - 1, dx ** 2 / dt + 2 + gamma), 1 + dx ** 2 / dt + gamma,
+                  dx ** 2 / dt + kappa, np.full(N - 1, dx ** 2 / dt + 2 * kappa), dx ** 2 / dt + kappa))
+upper_minor = np.hstack((0, -np.ones(N), 0, 0, np.full(N - 1, -kappa)))
+lower_minor = np.hstack((-np.ones(N), 0, np.full(N - 1, -kappa), 0, 0))
 B = sp.dia_matrix((np.vstack((lower_minor, diag, upper_minor)), [-1, 0, 1]), (2 * N + 2, 2 * N + 2))
 B *= dt
 
-cdiag = np.hstack((0, np.full(N - 1, -gamma * dx ** 2 * dt), 0))
+cdiag = np.full(N + 1, -gamma * dx ** 2 * dt)
 cdia_mat = sp.dia_matrix((cdiag, 0), (N + 1, N + 1))
 C = sp.vstack((sp.csr_matrix((N + 1, 2 * N + 2)), sp.hstack((cdia_mat, sp.csc_matrix((N + 1, N + 1))))))
 
@@ -42,13 +43,13 @@ M = B + C
 print(M.toarray())
 
 def AApply(u):
-    v = u[N + 2:-1]
+    v = u[N + 1:]
     w = v * (1 - v) * (v - alpha)
-    # print(dx ** 2 * dt * np.hstack((0, w, 0, 0, -w, 0)))
-    return dx ** 2 * dt * np.hstack((0, w, 0, 0, -w, 0))
+    # print(dx ** 2 * dt * np.hstack((w, -w)))
+    return (dx ** 2 * dt * np.hstack((w, -w)))
 
 def AssembleLinearization(u):
-    rightm = sp.dia_matrix((np.hstack((0, -3 * u[N + 2:-1] ** 2 + 2 * (1 + alpha) * u[N + 2:-1] - alpha, 0)), 0), (N + 1, N + 1))
+    rightm = sp.dia_matrix((-3 * u[N + 1:] ** 2 + 2 * (1 + alpha) * u[N + 1:] - alpha, 0), (N + 1, N + 1))
     Alin = sp.bmat([[sp.coo_matrix((N + 1, N + 1)), rightm], [None, -rightm]])
     # print(dx ** 2 * dt * Alin.toarray())
     return dx ** 2 * dt * Alin
@@ -85,8 +86,10 @@ t = 0.0
 it = 1
 while t <= tend:
     print("\n\nt = {:10.2f}".format(t))
+    print(s)
     # if it % 200 == 0:
-    if it % 100 == 0:
+    if it % 1 == 0:
+        # input("")
         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         print("mass = " + str(s.sum()))
         line_e.set_ydata(s[N + 1:])
@@ -109,7 +112,7 @@ while t <= tend:
     sold = np.copy(s)
     wnorm = 1e99
 
-    rhs1 = dx ** 2 * np.hstack((0, sold[1:N], 0, 0, sold[N + 2:-1], 0))
+    rhs1 = dx ** 2 * sold
     # Newton solver
     while wnorm > 1e-9:
         rhs = np.copy(rhs1)
@@ -118,10 +121,14 @@ while t <= tend:
         rhs -= As
         Alin = AssembleLinearization(s)
 
+        # print("M + Alin = " + str((M + Alin).toarray()))
         w = splinalg.spsolve(M + Alin, rhs)
+        # print("w = " + str(w))
+        # w = splinalg.spsolve(M, rhs)
         wnorm = np.linalg.norm(w)
         print("|w| = {:7.3e} ".format(wnorm),end="")
         s += w
+        # input("")
 
     t += dt
     it += 1
