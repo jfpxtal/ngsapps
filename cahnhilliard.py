@@ -1,5 +1,6 @@
 from netgen.geom2d import unit_square
 from ngsolve import *
+from ngsapps.utils import *
 import random
 
 order = 3
@@ -65,6 +66,8 @@ mstar = b.mat.CreateMatrix()
 s = GridFunction(fes)
 
 set_initial_conditions(s.components[0])
+#alternative: use random number generator pointwise:
+#s.components[0].Set(RandomCF(0.0,1.0))
 s.components[1].Set(CoefficientFunction(0.0))
 
 rhs = s.vec.CreateVector()
