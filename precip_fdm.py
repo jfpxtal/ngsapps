@@ -28,14 +28,13 @@ if output:
     outfile = open("precip.bin", "wb")
 
 # kappa == 0
-diag = np.hstack((1 + dx ** 2 / dt + gamma, np.full(N - 1, dx ** 2 / dt + 2 + gamma), 1 + dx ** 2 / dt + gamma,
-                  dx ** 2 / dt + kappa, np.full(N - 1, dx ** 2 / dt + 2 * kappa), dx ** 2 / dt + kappa))
-upper_minor = np.hstack((0, -np.ones(N), 0, 0, np.full(N - 1, -kappa)))
-lower_minor = np.hstack((-np.ones(N), 0, np.full(N - 1, -kappa), 0, 0))
+diag = np.hstack((dt / (dx ** 2) + 1 + dt * gamma, np.full(N - 1, 1 + 2 * dt / (dx ** 2) + dt * gamma), dt / (dx ** 2) + 1 + dt * gamma,
+                  1 + kappa * dt / (dx ** 2), np.full(N - 1, 1 + 2 * kappa * dt / (dx ** 2)), 1 + kappa * dt / (dx ** 2)))
+upper_minor = np.hstack((0, np.full(N, -dt / (dx ** 2)), 0, 0, np.full(N - 1, -kappa * dt / (dx ** 2))))
+lower_minor = np.hstack((np.full(N, -dt / (dx ** 2)), 0, np.full(N - 1, -kappa * dt / (dx ** 2)), 0, 0))
 B = sp.dia_matrix((np.vstack((lower_minor, diag, upper_minor)), [-1, 0, 1]), (2 * N + 2, 2 * N + 2))
-B *= dt
 
-cdiag = np.full(N + 1, -gamma * dx ** 2 * dt)
+cdiag = np.full(N + 1, -gamma * dt)
 cdia_mat = sp.dia_matrix((cdiag, 0), (N + 1, N + 1))
 C = sp.vstack((sp.csr_matrix((N + 1, 2 * N + 2)), sp.hstack((cdia_mat, sp.csc_matrix((N + 1, N + 1))))))
 
@@ -45,14 +44,14 @@ print(M.toarray())
 def AApply(u):
     v = u[N + 1:]
     w = v * (1 - v) * (v - alpha)
-    # print(dx ** 2 * dt * np.hstack((w, -w)))
-    return (dx ** 2 * dt * np.hstack((w, -w)))
+    # print(dt * np.hstack((w, -w)))
+    return (dt * np.hstack((w, -w)))
 
 def AssembleLinearization(u):
     rightm = sp.dia_matrix((-3 * u[N + 1:] ** 2 + 2 * (1 + alpha) * u[N + 1:] - alpha, 0), (N + 1, N + 1))
     Alin = sp.bmat([[sp.coo_matrix((N + 1, N + 1)), rightm], [None, -rightm]])
-    # print(dx ** 2 * dt * Alin.toarray())
-    return dx ** 2 * dt * Alin
+    # print(dt * Alin.toarray())
+    return dt * Alin
 
 
 s = np.hstack((np.full(10 / dx, delta), np.full(10 / dx, -delta), np.zeros(N + 1 - 20 / dx), np.full(N + 1, alpha)))
@@ -86,9 +85,9 @@ t = 0.0
 it = 1
 while t <= tend:
     print("\n\nt = {:10.2f}".format(t))
-    print(s)
+    # print(s)
     # if it % 200 == 0:
-    if it % 1 == 0:
+    if it % 100 == 0:
         # input("")
         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         print("mass = " + str(s.sum()))
@@ -112,10 +111,9 @@ while t <= tend:
     sold = np.copy(s)
     wnorm = 1e99
 
-    rhs1 = dx ** 2 * sold
     # Newton solver
     while wnorm > 1e-9:
-        rhs = np.copy(rhs1)
+        rhs = np.copy(sold)
         rhs -= M.dot(s)
         As = AApply(s)
         rhs -= As
