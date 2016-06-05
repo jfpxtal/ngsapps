@@ -5,13 +5,11 @@ from ngsolve import *
 from netgen.geom2d import MakeCircle
 from netgen.geom2d import SplineGeometry
 
-ngsglobals.msg_level = 1
-
 order = 3
 
 # time step and end
-tau = 1e-3
-tend = 1.0
+tau = 5e-2
+tend = 20.0
 
 # model parameters
 dL = 0.01
@@ -29,7 +27,8 @@ mesh.Curve(order)
 # inside the bulk:
 Vbulk = H1(mesh, order=order)
 # on the surface:
-Vsurface = H1(mesh, order=order, flags={"definedon": [], "definedonbound": [1], "dirichlet": [1]})
+Vsurface = H1(mesh, order=order, flags={"definedon": [], "definedonbound": [1],
+                                        "dirichlet": [1]})
 
 # construct compound finite element space
 fes = FESpace([Vbulk, Vsurface])
@@ -82,6 +81,7 @@ rhs = s.vec.CreateVector()
 Draw(s.components[1], mesh, "l")
 Draw(s.components[0], mesh, "L")
 
+input("Press any key...")
 # implicit Euler
 t = 0.0
 while t < tend:

@@ -5,8 +5,6 @@ from ngsolve import *
 from netgen.geom2d import MakeCircle
 from netgen.geom2d import SplineGeometry
 
-ngsglobals.msg_level = 1
-
 order = 3
 
 # time step and end
