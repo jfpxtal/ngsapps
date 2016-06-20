@@ -1,5 +1,6 @@
 add_library(ngsapps_utils ${NGS_LIB_TYPE}
   utils_python.cpp randomcf.hpp randomcf.cpp
+  lagrangefespace.hpp lagrangefespace.cpp lagrangefe.hpp lagrangefe.cpp
   )
 
 set_target_properties(ngsapps_utils PROPERTIES SUFFIX ".so")
