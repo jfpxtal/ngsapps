@@ -53,8 +53,8 @@ T = 1 # ??
 beta = 1
 
 # diffusion coefficients
-kappa = 1e-99
-gamma = 1e-99
+kappa = 1
+gamma = 1
 
 vtkoutput = False
 
@@ -98,10 +98,10 @@ elif usegeo == "square":
 elif usegeo == "1d":
     netmesh = NetMesh()
     netmesh.dim = 1
-    N = 100
+    N = 1000
     pnums = []
     for i in range(0, N + 1):
-        pnums.append(netmesh.Add(MeshPoint(Pnt(i, 0, 0))))
+        pnums.append(netmesh.Add(MeshPoint(Pnt(i * 1 / N, 0, 0))))
 
     for i in range(0, N):
         netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
@@ -133,7 +133,8 @@ b += SymbolicBFI(u * tu)
 b += SymbolicBFI(rho * trho)
 
 c = BilinearForm(fes)
-c += SymbolicBFI(-grad(u) * grad(tmu))
+c += SymbolicBFI(grad(u) * grad(tmu))
+c += SymbolicBFI(mu * tmu)
 
 l = LinearForm(fes)
 l += SymbolicLFI(f * tu)
@@ -143,20 +144,21 @@ b.Assemble()
 c.Assemble()
 l.Assemble()
 
-mstar = a.mat.CreateMatrix()
+mstar = b.mat.CreateMatrix()
 
 s = GridFunction(fes)
 
-# s.components[0].Set(CoefficientFunction(0.0))
-s.components[0].Set(RandomCF(0.0,1.0))
+s.components[0].Set(CoefficientFunction(0.0))
+# s.components[0].Set(RandomCF(0.0,1.0))
 # set_initial_conditions(s.components[0], mesh)
 # s.components[1].Set(RandomCF(0.2,0.8))
-s.components[1].Set(CoefficientFunction(rho0))
+# s.components[1].Set(CoefficientFunction(rho0))
+s.components[1].Set(0.5 * (cos(100 * (x + y)) + 1))
 s.components[2].Set(CoefficientFunction(0.0))
 # s.components[2].Set(RandomCF(0.0,1.0))
 
 if usegeo == "1d":
-    xs = [i for i in range(0, N + 1)]
+    xs = [i * 1 / N for i in range(0, N + 1)]
 
     def get_vals(u):
         return [u(x) for x in xs]
@@ -178,15 +180,17 @@ Draw(s.components[1], mesh, "rho")
 Draw(s.components[0], mesh, "u")
 
 if vtkoutput:
-    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_",subdivision=4)
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_implicit_",subdivision=4)
     vtk.Do()
 
 input("Press any key...")
 # implicit Euler
 t = 0.0
-while t < tend:
+it = 0
+# while t < tend:
+while True:
     print("\n\nt = {:10.6e}".format(t))
-    if usegeo == "1d":
+    if usegeo == "1d" and it % 50 == 0:
         line_u.set_ydata(get_vals(s.components[0]))
         ax_u.relim()
         ax_u.autoscale_view()
@@ -243,6 +247,7 @@ while t < tend:
         # input("")
 
     t += tau
+    it += 1
     Redraw(blocking=False)
     if vtkoutput:
         vtk.Do()
