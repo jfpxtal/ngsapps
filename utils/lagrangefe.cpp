@@ -32,7 +32,7 @@ T LagrangeSegm::T_LagrangeBasis1D(int i, const T &x) const
   for (int a = 0; a <= order; ++a)
   {
     if (a != i)
-      res *= (order * x - a) / (i - a);
+      res *= (order * x - a) * (1.0 / (i - a));
   }
 
   return res;
@@ -96,11 +96,11 @@ T LagrangeTrig::T_LagrangeBasis2D(int i, int j, const T &x, const T &y) const
 {
   T res = 1.0;
   for (int a = 0; a < i; ++a)
-    res *= (order * x - a) / (i - a);
+    res *= (order * x - a) * (1.0 / (i - a));
   for (int b = 0; b < j; ++b)
-    res *= (order * y - b) / (j - b);
+    res *= (order * y - b) * (1.0 / (j - b));
   for (int c = i + j + 1; c <= order; ++c)
-    res *= (c - order * x - order * y) / (c - i - j);
+    res *= (c - order * x - order * y) * (1.0 / (c - i - j));
 
   return res;
 }
