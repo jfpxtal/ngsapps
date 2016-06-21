@@ -27,13 +27,18 @@ koff = 10 # 1 / s
 # linker bond length
 delta = 1e-9 # m
 # density of available linkers
-rho0 = 1e14 # 1 / m^-2
-# negative outward pressure ?
-f = 2e-4
+rho0 = 1e14 # 1 / m^2
+# cortical stress
+f = 2e-4 # N / m
 
 # temperature
-T = 293 # ??
+T = 293 # K
 beta = 1 / (sciconst.Boltzmann * T)
+
+# # membrane bending rigidity
+# kappa = 1e-19 # J
+# # membrane surface tension
+# gamma = 5e-5 # N / m
 
 # # stiffness of linker proteins
 # k = 1 # N / m
@@ -44,17 +49,18 @@ beta = 1 / (sciconst.Boltzmann * T)
 # # linker bond length
 # delta = 1 # m
 # # density of available linkers
-# rho0 = 0 # 1 / m^-2
-# # negative outward pressure ?
-# f = 1
+# rho0 = 0 # 1 / m^2
+# # cortical stress
+# f = 1e-4 # N / m
 
 # # temperature
-# T = 1 ??
+# T = 1 # K
 # beta = 1
 
-# diffusion coefficients
-kappa = 1
-gamma = 1
+# membrane bending rigidity
+kappa = 1 # J
+# membrane surface tension
+gamma = 1 # N / m
 
 vtkoutput = False
 
@@ -143,6 +149,10 @@ mstar = b.mat.CreateMatrix()
 
 s = GridFunction(fes)
 
+d = BilinearForm(fes)
+d += SymbolicBFI(-k * s.components[1] * u * tu)
+d += SymbolicBFI(-koff * exp(beta * k * s.components[0] * delta) * rho * trho)
+
 s.components[0].Set(CoefficientFunction(0.0))
 # s.components[0].Set(RandomCF(0.0,1.0))
 # set_initial_conditions(s.components[0], mesh)
@@ -171,12 +181,12 @@ sold = s.vec.CreateVector()
 As = s.vec.CreateVector()
 w = s.vec.CreateVector()
 
-# Draw(s.components[2], mesh, "mu")
+Draw(s.components[2], mesh, "mu")
 Draw(s.components[1], mesh, "rho")
 Draw(s.components[0], mesh, "u")
 
 if vtkoutput:
-    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_semiexplicit_",subdivision=4)
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_semiexplicit_",subdivision=3)
     vtk.Do()
 
 input("Press any key...")
@@ -195,14 +205,7 @@ while True:
         ax_rho.autoscale_view()
         fig.canvas.draw_idle()
         plt.pause(0.05)
-        # print(s.components[0].vec)
-        # input("")
-    # print(s.components[1].vec)
-    # input("")
 
-    d = BilinearForm(fes)
-    d += SymbolicBFI(-k * s.components[1] * u * tu)
-    d += SymbolicBFI(-koff * exp(beta * k * s.components[0] * delta) * rho * trho)
     d.Assemble()
 
     rhs.data = b.mat * s.vec

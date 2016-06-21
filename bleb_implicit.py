@@ -7,54 +7,60 @@ import scipy.constants as sciconst
 import matplotlib.pyplot as plt
 import random
 
-usegeo = "1d"
+usegeo = "circle"
 
-order = 1
-maxh = 0.2
+order = 3
+maxh = 0.1
 
 initial_roughness = 20.0
 
 # time step and end
-tau = 1e-8
+tau = 1e-5
 tend = 3
 
-# # stiffness of linker proteins
-# k = 1e-4 # N / m
-# # linker attachment rate
-# kon = 1e4 # 1 / s
-# # linker detachment rate
-# koff = 10 # 1 / s
-# # linker bond length
-# delta = 1e-9 # m
-# # density of available linkers
-# rho0 = 1e14 # 1 / m^-2
-# # negative outward pressure ?
-# f = 1e-5
-
-# # temperature
-# T = 293 # ??
-# beta = 1 / (sciconst.Boltzmann * T)
-
 # stiffness of linker proteins
-k = 1 # N / m
+k = 1e-4 # N / m
 # linker attachment rate
-kon = 1 # 1 / s
+kon = 1e4 # 1 / s
 # linker detachment rate
-koff = 1 # 1 / s
+koff = 10 # 1 / s
 # linker bond length
-delta = 1 # m
+delta = 1e-9 # m
 # density of available linkers
-rho0 = 1 # 1 / m^-2
-# negative outward pressure ?
-f = 1e-2
+rho0 = 1e14 # 1 / m^2
+# cortical stress
+f = 2e-4 # N / m
 
 # temperature
-T = 1 # ??
-beta = 1
+T = 293 # K
+beta = 1 / (sciconst.Boltzmann * T)
 
-# diffusion coefficients
-kappa = 1
-gamma = 1
+# # membrane bending rigidity
+# kappa = 1e-19 # J
+# # membrane surface tension
+# gamma = 5e-5 # N / m
+
+# # stiffness of linker proteins
+# k = 1 # N / m
+# # linker attachment rate
+# kon = 1 # 1 / s
+# # linker detachment rate
+# koff = 0.2 # 1 / s
+# # linker bond length
+# delta = 1 # m
+# # density of available linkers
+# rho0 = 0 # 1 / m^2
+# # cortical stress
+# f = 1e-4 # N / m
+
+# # temperature
+# T = 1 # K
+# beta = 1
+
+# membrane bending rigidity
+kappa = 1 # J
+# membrane surface tension
+gamma = 1 # N / m
 
 vtkoutput = False
 
@@ -111,8 +117,9 @@ elif usegeo == "1d":
 
     mesh = Mesh(netmesh)
 
+UV = H1(mesh, order=order, dirichlet=[1,2,3,4])
 V = H1(mesh, order=order)
-fes = FESpace([V, V, V])
+fes = FESpace([UV, V, V])
 u, rho, mu = fes.TrialFunction()
 tu, trho, tmu = fes.TestFunction()
 # fes = FESpace([V, V])
@@ -153,8 +160,9 @@ s.components[0].Set(CoefficientFunction(0.0))
 # set_initial_conditions(s.components[0], mesh)
 # s.components[1].Set(RandomCF(0.2,0.8))
 # s.components[1].Set(CoefficientFunction(rho0))
-s.components[1].Set(0.5 * (cos(100 * (x + y)) + 1))
-s.components[2].Set(CoefficientFunction(0.0))
+# s.components[1].Set(0.5 * (cos(100 * (x + y)) + 1))
+s.components[1].Set(IfPos(x,1.0,0.0))
+# s.components[2].Set(CoefficientFunction(0.0))
 # s.components[2].Set(RandomCF(0.0,1.0))
 
 if usegeo == "1d":
@@ -175,12 +183,12 @@ sold = s.vec.CreateVector()
 As = s.vec.CreateVector()
 w = s.vec.CreateVector()
 
-# Draw(s.components[2], mesh, "mu")
+Draw(s.components[2], mesh, "mu")
 Draw(s.components[1], mesh, "rho")
 Draw(s.components[0], mesh, "u")
 
 if vtkoutput:
-    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_implicit_",subdivision=4)
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_implicit_",subdivision=3)
     vtk.Do()
 
 input("Press any key...")
@@ -235,7 +243,7 @@ while True:
         # print("+++++++++++++++++++++++++++++++++++++++++++++")
         # print(mstar.AsVector().data,5)
         # input("")
-        invmat = mstar.Inverse()
+        invmat = mstar.Inverse(fes.FreeDofs())
         # print(invmat)
         # input("")
         w.data = invmat * rhs
