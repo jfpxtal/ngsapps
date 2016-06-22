@@ -13,6 +13,7 @@ namespace ngcomp
     int ndof;
 
     Array<int> first_edge_dof;
+    Array<int> first_face_dof;
     Array<int> first_cell_dof;
   public:
     LagrangeFESpace(shared_ptr<MeshAccess> ama, const Flags & flags);

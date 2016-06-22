@@ -48,6 +48,27 @@ namespace ngfem
     void T_CalcShape(const T & x, const T & y, SliceVector<T> shape) const;
   };
 
+  class LagrangeTet : public ScalarFiniteElement<3>
+  {
+    int vnums[4];
+  public:
+    LagrangeTet(int order);
+    virtual ELEMENT_TYPE ElementType() const { return ET_TET; }
+    void SetVertexNumber(int i, int v) { vnums[i] = v; }
+
+    virtual void CalcShape(const IntegrationPoint & ip,
+                            SliceVector<> shape) const;
+
+    virtual void CalcDShape(const IntegrationPoint & ip,
+                             SliceMatrix<> dshape) const;
+
+  private:
+    template <class T>
+    T T_LagrangeBasis3D(int i, int j,  int k, const T &x, const T &y, const T &z) const;
+    template <class T>
+    void T_CalcShape(const T & x, const T & y, const T & z, SliceVector<T> shape) const;
+  };
+
 }
 
 #endif
