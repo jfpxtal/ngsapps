@@ -51,23 +51,18 @@ void LagrangeFESpace::Update(LocalHeap & h)
     first_edge_dof[i] = ii;
   first_edge_dof[n_edge] = ii;
 
-  if (ma->GetDimension() == 2)
-  {
-    n_face = n_cell;
-  }
-
-  first_face_dof.SetSize (n_face+1);
-  for (int i = 0; i < n_face; i++, ii+=(order-1)*(order-2)/2)
-    first_face_dof[i] = ii;
-  first_face_dof[n_face] = ii;
-
   if (ma->GetDimension() == 3)
   {
-    first_cell_dof.SetSize (n_cell+1);
-    for (int i = 0; i < n_cell; i++, ii+=(order-1)*(order-2)*(order-3)/6)
-      first_cell_dof[i] = ii;
-    first_cell_dof[n_cell] = ii;
+    first_face_dof.SetSize (n_face+1);
+    for (int i = 0; i < n_face; i++, ii+=(order-1)*(order-2)/2)
+      first_face_dof[i] = ii;
+    first_face_dof[n_face] = ii;
   }
+
+  first_cell_dof.SetSize (n_cell+1);
+  for (int i = 0; i < n_cell; i++, ii+=( ma->GetDimension() == 3 ? (order-1)*(order-2)*(order-3)/6 : (order-1)*(order-2)/2))
+    first_cell_dof[i] = ii;
+  first_cell_dof[n_cell] = ii;
 
   // cout << "first_edge_dof = " << endl << first_edge_dof << endl;
   // cout << "first_face_dof = " << endl << first_face_dof << endl;
@@ -98,7 +93,8 @@ void LagrangeFESpace::GetDofNrs(int elnr, Array<int> &dnums) const
     }
 
   // face dofs
-  for (int i = 0; i < (ma->GetDimension() == 3 ? 4 : 1); i++)
+  if (ma->GetDimension() == 3)
+  for (int i = 0; i < 4; i++)
   {
     int fi = (ma->GetDimension() == 3 ? ngel.faces[i] : elnr);
     int first = first_face_dof[fi];
@@ -107,13 +103,10 @@ void LagrangeFESpace::GetDofNrs(int elnr, Array<int> &dnums) const
       dnums.Append (j);
   }
 
-  if (ma->GetDimension() == 3)
-  {
-    int first = first_cell_dof[elnr];
-    int next  = first_cell_dof[elnr+1];
-    for (int j = first; j < next; j++)
-      dnums.Append (j);
-  }
+  int first = first_cell_dof[elnr];
+  int next  = first_cell_dof[elnr+1];
+  for (int j = first; j < next; j++)
+    dnums.Append (j);
   // cout << "dnums = " << dnums << endl;
 }
 
@@ -204,7 +197,30 @@ const FiniteElement & LagrangeFESpace::GetSFE (int elnr, LocalHeap &lh) const
 
     return *trig;
   }
+}
 
+void LagrangeFESpace :: GetVertexDofNrs (int vnr, Array<int> & dnums) const
+{
+  dnums.SetSize(1);
+  dnums[0] = vnr;
+}
+  
+  
+void LagrangeFESpace :: GetEdgeDofNrs (int ednr, Array<int> & dnums) const
+{
+  dnums = IntRange(first_edge_dof[ednr],first_edge_dof[ednr+1]);
+}
+
+void LagrangeFESpace :: GetFaceDofNrs (int fanr, Array<int> & dnums) const
+{
+  dnums.SetSize0();
+  if (ma->GetDimension() < 3) return;
+  dnums = IntRange(first_face_dof[fanr],first_face_dof[fanr+1]);
+}
+
+void LagrangeFESpace :: GetInnerDofNrs (int elnr, Array<int> & dnums) const
+{
+  dnums = IntRange(first_cell_dof[elnr],first_cell_dof[elnr+1]);
 }
 
 
