@@ -8,7 +8,7 @@ from ngsapps.utils import Lagrange
 
 ngsglobals.msg_level = 1
 
-dim = 3
+dim = 2
 # generate a triangular mesh of mesh-size 0.2
 if dim == 2:
     mesh = Mesh (unit_square.GenerateMesh(maxh=0.2))
@@ -35,7 +35,10 @@ f.Assemble()
 
 # the solution field 
 u = GridFunction (V)
-u.vec.data = a.mat.Inverse(V.FreeDofs(), inverse="sparsecholesky") * f.vec
+u.Set(1*x)
+
+f.vec.data -= a.mat * u.vec
+u.vec.data += a.mat.Inverse(V.FreeDofs(), inverse="sparsecholesky") * f.vec
 # print (u.vec)
 
 
@@ -44,8 +47,8 @@ Draw (u)
 Draw (-u.Deriv(), mesh, "Flux")
 
 if dim == 2:
-    exact = 16*x*(1-x)*y*(1-y)
+    exact = 1*x + 16*x*(1-x)*y*(1-y)
 else:
-    exact = 16*x*(1-x)*y*(1-y)*z*(1-z)
+    exact = 1*x + 16*x*(1-x)*y*(1-y)*z*(1-z)
 print ("L2-error:", sqrt (Integrate ( (u-exact)*(u-exact), mesh)))
 
