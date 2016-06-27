@@ -4,9 +4,9 @@ import numpy as np
 import numpy.random as random
 import scipy.sparse as sp
 import scipy.sparse.linalg as splinalg
+import multiprocessing as mp
 import matplotlib.pyplot as plt
-import threading
-from queue import Queue
+
 
 # from netgen.geom2d import unit_square, MakeCircle, SplineGeometry
 # from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, FaceDescriptor, Mesh as NetMesh
@@ -17,13 +17,14 @@ np.set_printoptions(linewidth=400, threshold=100000)
 
 # L = 10
 # N = 4
-L = 700
+# L = 700
+L = 200
 N = 70
 dx = L / N
 
-dt = 0.05
+# dt = 0.05
+dt = 0.2
 tend = 4000
-# tend = 1000
 
 gamma = 0.1
 alpha = 0.2
@@ -31,9 +32,13 @@ kappa = 0
 
 delta = 0.1
 
-output = True
-if output:
-    outfile = open("precip.bin", "wb")
+interpolation = 'nearest'
+
+ic_from_file = None
+# ic_from_file = 'precip.ic'
+
+outfile = None
+# outfile = open("precip2d.bin", "wb")
 
 rowidxs = []
 colidxs =[]
@@ -44,7 +49,7 @@ def to_vec_index(func, coord):
     i, j = coord
     if func == 'c':
         return i + j * (N + 1)
-    else:
+    elif func == 'e':
         return (N + 1) ** 2 + i + j * (N + 1)
 
 def newentry(i, j, d):
@@ -100,10 +105,14 @@ def AssembleLinearization(u):
     # print(dt * Alin.toarray())
     return dt * Alin
 
+s = np.zeros(2 * (N + 1) ** 2)
+if ic_from_file:
+    with open(ic_from_file, 'rb') as icfile:
+        s += np.load(icfile)
 
-# s = random.rand(2 * (N + 1) ** 2)
-# s = np.hstack((np.full(2 * (N + 1), delta), np.full(2 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 4 * (N + 1)), np.full((N + 1) ** 2, alpha)))
-s = np.hstack((np.full(10 * (N + 1), delta), np.full(10 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 20 * (N + 1)), np.full((N + 1) ** 2, alpha)))
+# s += random.rand(2 * (N + 1) ** 2)
+# s += np.hstack((np.full(2 * (N + 1), delta), np.full(2 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 4 * (N + 1)), np.full((N + 1) ** 2, alpha)))
+s += np.hstack((np.full(10 * (N + 1), delta), np.full(10 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 20 * (N + 1)), np.full((N + 1) ** 2, alpha)))
 
 # netmesh = NetMesh()
 # netmesh.dim = 2
@@ -139,57 +148,65 @@ s = np.hstack((np.full(10 * (N + 1), delta), np.full(10 * (N + 1), -delta), np.z
 # Draw(svis)
 
 
+def plot_proc(t_sh, s_sh):
+    with t_sh.get_lock(), s_sh.get_lock():
+        t = t_sh.value
+        s = np.frombuffer(s_sh.get_obj())
 
-ts = [0]
-masses = [s.sum()]
-q = Queue()
-
-def plot_thread(s):
     fig_sol = plt.figure()
 
     ax_e = fig_sol.add_subplot(211)
     data_e = s[(N+1) ** 2:].reshape((N+1, N+1))
-    im_e = ax_e.imshow(data_e, interpolation='nearest', origin='bottom',
+    im_e = ax_e.imshow(data_e, interpolation=interpolation, origin='bottom',
                         aspect='auto', vmin=np.min(data_e), vmax=np.max(data_e))
-    plt.colorbar(im_e)
+    fig_sol.colorbar(im_e, ax=ax_e, label='e')
 
     ax_c = fig_sol.add_subplot(212)
     data_c = s[:(N+1) ** 2].reshape((N+1, N+1))
-    im_c = ax_c.imshow(data_c, interpolation='nearest', origin='bottom',
+    im_c = ax_c.imshow(data_c, interpolation=interpolation, origin='bottom',
                         aspect='auto', vmin=np.min(data_c), vmax=np.max(data_c))
-    plt.colorbar(im_c)
+    fig_sol.colorbar(im_c, ax=ax_c, label='c')
 
+    ts = [0]
+    masses = [s.sum()]
     fig_mass = plt.figure()
     ax_mass = fig_mass.add_subplot(111)
     line_mass, = ax_mass.plot(ts, masses, "g", label=r"$\int\;c + e$")
     ax_mass.legend()
+
+    fig_sol.tight_layout()
     plt.show(block=False)
     while True:
-        try:
-            t, s = q.get_nowait()
-            ts.append(t)
-            masses.append(s.sum())
-            im_e.set_data(s[(N+1) ** 2:].reshape((N+1, N+1)))
-            im_c.set_data(s[:(N+1) ** 2].reshape((N+1, N+1)))
-            line_mass.set_xdata(ts)
-            line_mass.set_ydata(masses)
-            ax_mass.relim()
-            ax_mass.autoscale_view()
+        with t_sh.get_lock(), s_sh.get_lock():
+            t = t_sh.value
+            s = np.frombuffer(s_sh.get_obj())
+        ts.append(t)
+        masses.append(s.sum())
+        im_e.set_data(s[(N+1) ** 2:].reshape((N+1, N+1)))
+        im_c.set_data(s[:(N+1) ** 2].reshape((N+1, N+1)))
+        line_mass.set_xdata(ts)
+        line_mass.set_ydata(masses)
+        ax_mass.relim()
+        ax_mass.autoscale_view()
 
-            if output:
-                np.save(outfile, s)
-        except Empty:
-            pass
+        # if outfile:
+        #     np.save(outfile, s)
         plt.pause(0.05)
 
-thread = threading.Thread(target=plot_thread, args=(s,))
-thread.start()
+
+t_sh = mp.Value('d', 0.0)
+s_sh = mp.Array('d', s)
+proc = mp.Process(target=plot_proc, args=(t_sh, s_sh))
+proc.start()
+
+input('Press any key...\n\n')
+# implicit Euler
 t = 0.0
 while t <= tend:
     print("\n\nt = {:10.2f}".format(t))
+
     # svis.vec = s[(N + 1) ** 2:]
     # Redraw()
-
 
     sold = np.copy(s)
     wnorm = 1e99
@@ -209,9 +226,8 @@ while t <= tend:
         # input("")
 
     t += dt
-    q.put((t, s))
+    with t_sh.get_lock(), s_sh.get_lock():
+        t_sh.value = t
+        s_sh[:] = s
 
 print()
-if output:
-    outfile.close()
-plt.show()
