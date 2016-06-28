@@ -8,10 +8,10 @@ import multiprocessing as mp
 import matplotlib.pyplot as plt
 
 
-# from netgen.geom2d import unit_square, MakeCircle, SplineGeometry
-# from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, FaceDescriptor, Mesh as NetMesh
-# from netgen.csg import Pnt
-
+from netgen.geom2d import unit_square, MakeCircle, SplineGeometry
+from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, FaceDescriptor, Mesh as NetMesh
+from netgen.csg import Pnt
+from ngsolve import *
 # from ngsapps.utils import *
 np.set_printoptions(linewidth=400, threshold=100000)
 
@@ -114,38 +114,42 @@ if ic_from_file:
 # s += np.hstack((np.full(2 * (N + 1), delta), np.full(2 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 4 * (N + 1)), np.full((N + 1) ** 2, alpha)))
 s += np.hstack((np.full(10 * (N + 1), delta), np.full(10 * (N + 1), -delta), np.zeros((N + 1) ** 2 - 20 * (N + 1)), np.full((N + 1) ** 2, alpha)))
 
-# netmesh = NetMesh()
-# netmesh.dim = 2
-# pnums = []
-# for i in range(N + 1):
-#     for j in range(N + 1):
-#         pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, L * j / N, 0))))
+netmesh = NetMesh()
+netmesh.dim = 2
+
+continuous_ngplot = True
+
+if continuous_ngplot:
+    M = N
+else:
+    M = N+1
+pnums = []
+for i in range(M + 1):
+    for j in range(M + 1):
+        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / M, L * j / M, 0))))
 
 # print("b")
-# netmesh.Add(FaceDescriptor())
-# netmesh.SetMaterial(1, "mat")
-# for j in range(N):
-#     for i in range(N):
-#         netmesh.Add(Element2D(1, [pnums[i + j * (N + 1)], pnums[i + (j + 1) * (N + 1)], pnums[i + 1 + (j + 1) * (N + 1)], pnums[i + 1 + j * (N + 1)]]))
-#         # netmesh.Add(Element1D([pnums[i + j * (N + 1)], pnums[i + 1 + j * (N + 1)]], index=1))
-#         # netmesh.Add(Element1D([pnums[i + j * (N + 1)], pnums[i + (j + 1) * (N + 1)]], index=1))
+netmesh.Add (FaceDescriptor(surfnr=1,domin=1,bc=1))
+netmesh.SetMaterial(1, "mat")
+for j in range(M):
+    for i in range(M):
+        netmesh.Add(Element2D(1, [pnums[i + j * (M + 1)], pnums[i + (j + 1) * (M + 1)], pnums[i + 1 + (j + 1) * (M + 1)], pnums[i + 1 + j * (M + 1)]]))
 
-# #     netmesh.Add(Element1D([pnums[N + j * (N + 1)], pnums[N + (j + 1) * (N + 1)]], index=1))
-# #     netmesh.Add(Element1D([pnums[0 + j * (N + 1)], pnums[0 + (j + 1) * (N + 1)]], index=1))
+    netmesh.Add(Element1D([pnums[M + j * (M + 1)], pnums[M + (j + 1) * (M + 1)]], index=1))
+    netmesh.Add(Element1D([pnums[0 + j * (M + 1)], pnums[0 + (j + 1) * (M + 1)]], index=1))
 
-# # for i in range(N):
-# #     netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
-# #     netmesh.Add(Element1D([pnums[i + N * (N + 1)], pnums[i + 1 + N * (N + 1)]], index=1))
-# print("a")
-# mesh = Mesh(netmesh)
-# print("a")
-# Vvis = Lagrange(mesh, order=1)
-# print("a")
-# svis = GridFunction(Vvis)
-# print("a")
-# svis.vec = s[(N + 1) ** 2:]
-# print("a")
-# Draw(svis)
+for i in range(M):
+    netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
+    netmesh.Add(Element1D([pnums[i + M * (M + 1)], pnums[i + 1 + M * (M + 1)]], index=1))
+    
+mesh = Mesh(netmesh)
+if continuous_ngplot:
+    Vvis = H1(mesh, order=1)
+else:
+    Vvis = L2(mesh, order=0)
+svis = GridFunction(Vvis)
+svis.vec.FV().NumPy()[:] = s[(N + 1) ** 2:]
+Draw(svis)
 
 
 def plot_proc(t_sh, s_sh):
@@ -229,5 +233,7 @@ while t <= tend:
     with t_sh.get_lock(), s_sh.get_lock():
         t_sh.value = t
         s_sh[:] = s
+    svis.vec.FV().NumPy()[:] = s[(N + 1) ** 2:]
+    Redraw(blocking=False)
 
 print()
