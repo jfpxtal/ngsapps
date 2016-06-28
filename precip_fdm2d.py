@@ -76,8 +76,8 @@ for i in range(N + 1):
         newentry(to_vec_index('e', (i,j)), to_vec_index('c', (i,j)), gamma)
 
 def add_neumann(func, scale, bnd, inner):
-    newentry(to_vec_index(func, bnd), to_vec_index(func, bnd), -2 * scale / dx ** 2)
-    newentry(to_vec_index(func, bnd), to_vec_index(func, inner), 2 * scale / dx ** 2)
+    newentry(to_vec_index(func, bnd), to_vec_index(func, bnd), -1 * scale / dx ** 2)
+    newentry(to_vec_index(func, bnd), to_vec_index(func, inner), 1 * scale / dx ** 2)
 
 for i in range(N + 1):
     for f, s in [('c', 1), ('e', kappa)]:
