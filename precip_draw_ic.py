@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import matplotlib.animation as animation
-import matplotlib.lines as mlines
 
 import tkinter as tk
 from tkinter import filedialog
 
 N = 70
+alpha = 0.2
 span = 3
 interpolation = 'nearest'
 initialfile = 'precip.ic'
@@ -18,30 +18,30 @@ class DrawIC:
         self.fig_sol, (self.ax_button, self.ax_e, self.ax_c) = \
             plt.subplots(3, 1, gridspec_kw={'height_ratios':[1, 10, 10]})
 
-        self.data_e = np.zeros((N+1, N+1))
+        self.data_e = np.full((N+1, N+1), alpha)
         self.im_e = self.ax_e.imshow(self.data_e, interpolation=interpolation, origin='bottom',
                                      aspect='auto', vmin=0.0, vmax=1.0, animated=True)
         self.col_e = self.fig_sol.colorbar(self.im_e, ax=self.ax_e, label='e')
 
         self.data_c = np.zeros((N+1, N+1))
         self.im_c = self.ax_c.imshow(self.data_c, interpolation=interpolation, origin='bottom',
-                                     aspect='auto', vmin=0.0, vmax=1.0, animated=True)
+                                     aspect='auto', vmin=-1.0, vmax=1.0, animated=True)
         self.col_c = self.fig_sol.colorbar(self.im_c, ax=self.ax_c, label='c')
 
         self.ax_button_load = plt.axes([0, 0.95, 0.25, 0.04])
         self.button_load = Button(self.ax_button_load, 'Load from file')
         self.ax_button_save = plt.axes([0.25, 0.95, 0.25, 0.04])
         self.button_save = Button(self.ax_button_save, 'Save to file')
-        self.ax_button_clear_e = plt.axes([0.5, 0.95, 0.25, 0.04])
-        self.button_clear_e = Button(self.ax_button_clear_e, 'Clear e')
-        self.ax_button_clear_c = plt.axes([0.75, 0.95, 0.25, 0.04])
-        self.button_clear_c = Button(self.ax_button_clear_c, 'Clear c')
+        self.ax_button_reset_e = plt.axes([0.5, 0.95, 0.25, 0.04])
+        self.button_reset_e = Button(self.ax_button_reset_e, 'Reset e')
+        self.ax_button_reset_c = plt.axes([0.75, 0.95, 0.25, 0.04])
+        self.button_reset_c = Button(self.ax_button_reset_c, 'Reset c')
 
 
         self.button_load.on_clicked(self.on_load)
         self.button_save.on_clicked(self.on_save)
-        self.button_clear_e.on_clicked(self.on_clear_e)
-        self.button_clear_c.on_clicked(self.on_clear_c)
+        self.button_reset_e.on_clicked(self.on_reset_e)
+        self.button_reset_c.on_clicked(self.on_reset_c)
         self.fig_sol.canvas.mpl_connect('button_press_event', self.on_press)
         self.fig_sol.canvas.mpl_connect('button_release_event', self.on_release)
         self.fig_sol.canvas.mpl_connect('motion_notify_event', self.on_motion)
@@ -85,12 +85,14 @@ class DrawIC:
                             max(0,self.posx-self.span):min(N,self.posx+self.span)+1]
                 box += 0.1 * (2 - self.pressed)
                 box[box < 0] = 0
+                box[box > 1] = 1
                 self.redraw_e = True
             elif self.inaxes == self.ax_c:
                 box = self.data_c[max(0,self.posy-self.span):min(N,self.posy+self.span)+1,
                             max(0,self.posx-self.span):min(N,self.posx+self.span)+1]
                 box += 0.1 * (2 - self.pressed)
-                box[box < 0] = 0
+                box[box < -1] = -1
+                box[box > 1] = 1
                 self.redraw_c = True
 
         artists = []
@@ -139,11 +141,11 @@ class DrawIC:
                 np.save(outfile, np.hstack((self.data_c.flatten(), self.data_e.flatten())))
             print('Saved.')
 
-    def on_clear_e(self, event):
-        self.data_e.fill(0)
+    def on_reset_e(self, event):
+        self.data_e.fill(alpha)
         self.redraw_e = True
 
-    def on_clear_c(self, event):
+    def on_reset_c(self, event):
         self.data_c.fill(0)
         self.redraw_c = True
 
