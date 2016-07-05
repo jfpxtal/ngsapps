@@ -6,6 +6,7 @@ from ngsapps.utils import *
 import scipy.constants as sciconst
 import matplotlib.pyplot as plt
 import random
+import multiprocessing as mp
 
 usegeo = "circle"
 
@@ -15,52 +16,52 @@ maxh = 0.1
 initial_roughness = 20.0
 
 # time step and end
-tau = 1e-5
-tend = 3
+tau = 1e0
+tend = -1
 
-# stiffness of linker proteins
-k = 1e-4 # N / m
-# linker attachment rate
-kon = 1e4 # 1 / s
-# linker detachment rate
-koff = 10 # 1 / s
-# linker bond length
-delta = 1e-9 # m
-# density of available linkers
-rho0 = 1e14 # 1 / m^2
-# cortical stress
-f = 2e-4 # N / m
+# # stiffness of linker proteins
+# k = 1e-4 # N / m
+# # linker attachment rate
+# kon = 1e4 # 1 / s
+# # linker detachment rate
+# koff = 10 # 1 / s
+# # linker bond length
+# delta = 1e-9 # m
+# # density of available linkers
+# rho0 = 1e14 # 1 / m^2
+# # cortical stress
+# f = 2e-4 # N / m
 
-# temperature
-T = 293 # K
-beta = 1 / (sciconst.Boltzmann * T)
+# # temperature
+# T = 293 # K
+# beta = 1 / (sciconst.Boltzmann * T)
 
 # # membrane bending rigidity
 # kappa = 1e-19 # J
 # # membrane surface tension
 # gamma = 5e-5 # N / m
 
-# # stiffness of linker proteins
-# k = 1 # N / m
-# # linker attachment rate
-# kon = 1 # 1 / s
-# # linker detachment rate
-# koff = 0.2 # 1 / s
-# # linker bond length
-# delta = 1 # m
-# # density of available linkers
-# rho0 = 0 # 1 / m^2
-# # cortical stress
-# f = 1e-4 # N / m
+# stiffness of linker proteins
+k = 1 # N / m
+# linker attachment rate
+kon = 1 # 1 / s
+# linker detachment rate
+koff = 1 # 1 / s
+# linker bond length
+delta = 1 # m
+# density of available linkers
+rho0 = 0 # 1 / m^2
+# cortical stress
+f = 2e-1 # N / m
 
-# # temperature
-# T = 1 # K
-# beta = 1
+# temperature
+T = 1 # K
+beta = 1
 
 # membrane bending rigidity
-kappa = 1 # J
+kappa = 1e-5 # J
 # membrane surface tension
-gamma = 1 # N / m
+gamma = 1e-5 # N / m
 
 vtkoutput = False
 
@@ -158,9 +159,9 @@ s.components[0].Set(CoefficientFunction(0.0))
 # set_initial_conditions(s.components[0], mesh)
 # s.components[1].Set(RandomCF(0.2,0.8))
 # s.components[1].Set(CoefficientFunction(rho0))
-# s.components[1].Set(0.5 * (cos(100 * (x + y)) + 1))
-s.components[1].Set(IfPos(x,1.0,0.0))
-# s.components[2].Set(CoefficientFunction(0.0))
+s.components[1].Set(0.5 * (cos(10 * (x + y)) + 1))
+# s.components[1].Set(IfPos(x,1.0,0.0))
+s.components[2].Set(CoefficientFunction(0.0))
 # s.components[2].Set(RandomCF(0.0,1.0))
 
 if usegeo == "1d":
@@ -189,12 +190,44 @@ if vtkoutput:
     vtk = VTKOutput(ma=mesh,coefs=[s.components[0],s.components[1]],names=["u","rho"],filename="bleb_semiexplicit_",subdivision=3)
     vtk.Do()
 
+def plot_proc(massinit, t_sh, mass_sh):
+    import matplotlib.pyplot as plt
+    ts = [0]
+    masses = [massinit]
+    fig_mass = plt.figure()
+    ax_mass = fig_mass.add_subplot(111)
+    line_mass, = ax_mass.plot(ts, masses, "g", label=r"$\int\;u$")
+    ax_mass.legend(loc='upper left')
+
+    plt.show(block=False)
+    while True:
+        with t_sh.get_lock(), mass_sh.get_lock():
+            t = t_sh.value
+            mass = mass_sh.value
+        if t == -1:
+            break
+        elif t != ts[-1]:
+            ts.append(t)
+            masses.append(mass)
+            line_mass.set_xdata(ts)
+            line_mass.set_ydata(masses)
+            ax_mass.relim()
+            ax_mass.autoscale_view()
+
+        plt.pause(0.05)
+
+    plt.show()
+
+t_sh = mp.Value('d', 0.0)
+mass_sh = mp.Value('d', 0)
+proc = mp.Process(target=plot_proc, args=(Integrate(s.components[0], mesh), t_sh, mass_sh))
+
+proc.start()
 input("Press any key...")
 # implicit Euler
 t = 0.0
 it = 0
-# while t < tend:
-while True:
+while tend < 0 or t < tend - dt / 2:
     print("\n\nt = {:10.6e}".format(t))
     if usegeo == "1d" and it % 50 == 0:
         line_u.set_ydata(get_vals(s.components[0]))
@@ -221,3 +254,6 @@ while True:
     Redraw(blocking=False)
     if vtkoutput:
         vtk.Do()
+    with t_sh.get_lock(), mass_sh.get_lock():
+        t_sh.value = t
+        mass_sh.value = Integrate(s.components[0], mesh)
