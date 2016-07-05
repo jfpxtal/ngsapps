@@ -29,8 +29,8 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
     netmesh.dim = 2
 
     pnums = []
-    for i in range(N + 1):
-        for j in range(M + 1):
+    for j in range(M + 1):
+        for i in range(N + 1):
             pnums.append(netmesh.Add(MeshPoint(Pnt(p1x + (p2x-p1x) * i / N,
                                                    p1y + (p2y-p1y) * j / M, 0))))
 
