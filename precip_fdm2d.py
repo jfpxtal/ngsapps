@@ -7,22 +7,16 @@ import scipy.sparse.linalg as splinalg
 import multiprocessing as mp
 
 from netgen.geom2d import unit_square, MakeCircle, SplineGeometry
-from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
-                                       FaceDescriptor, Mesh as NetMesh
-from netgen.csg import Pnt
+from ngsapps.utils import *
 from ngsolve import *
 
 np.set_printoptions(linewidth=400, threshold=100000)
 
-# L = 10
-# N = 4
 # L = 700
 L = 200
-# N = 70
 N = 40
 dx = L / N
 
-# dt = 0.05
 dt = 0.2
 # tend = -1
 tend = 400
@@ -111,40 +105,13 @@ def AssembleLinearization(u):
     # print(dt * Alin.toarray())
     return dt * Alin
 
-
-netmesh = NetMesh()
-netmesh.dim = 2
-
 if continuous_ngplot:
     M = N
 else:
     M = N+1
 
-pnums = []
-for i in range(M + 1):
-    for j in range(M + 1):
-        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / M, L * j / M, 0))))
+mesh = Mesh(GenerateGridMesh((0,0), (L,L), M, M))
 
-netmesh.Add (FaceDescriptor(surfnr=1,domin=1,bc=1))
-netmesh.SetMaterial(1, 'mat')
-for j in range(M):
-    for i in range(M):
-        netmesh.Add(Element2D(1, [pnums[i + j * (M + 1)],
-                                  pnums[i + (j + 1) * (M + 1)],
-                                  pnums[i + 1 + (j + 1) * (M + 1)],
-                                  pnums[i + 1 + j * (M + 1)]]))
-
-    netmesh.Add(Element1D([pnums[M + j * (M + 1)],
-                           pnums[M + (j + 1) * (M + 1)]], index=1))
-    netmesh.Add(Element1D([pnums[0 + j * (M + 1)],
-                           pnums[0 + (j + 1) * (M + 1)]], index=1))
-
-for i in range(M):
-    netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
-    netmesh.Add(Element1D([pnums[i + M * (M + 1)],
-                           pnums[i + 1 + M * (M + 1)]], index=1))
-
-mesh = Mesh(netmesh)
 if continuous_ngplot:
     Vvis = H1(mesh, order=1)
 else:
@@ -169,7 +136,7 @@ else:
     #                 np.full((N + 1) ** 2, alpha)))
     # svis.vec.FV().NumPy()[:] = s
     width = 200
-    svis.components[0].Set(exp(-((x-L/2) * (x-L/2) + (y-L/2) * (y-L/2))/ width))
+    svis.components[0].Set(exp(-((x-L/2) * (x-L/2) + (y-L/2) * (y-L/2)) / width))
     svis.components[1].Set(CoefficientFunction(alpha))
     s = svis.vec.FV().NumPy()
 
