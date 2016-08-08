@@ -254,6 +254,8 @@ while tend < 0 or t < tend - dt / 2:
     Redraw(blocking=False)
     if vtkoutput:
         vtk.Do()
+    with TaskManager():
+        mass = Integrate(s.components[0], mesh)
     with t_sh.get_lock(), mass_sh.get_lock():
         t_sh.value = t
-        mass_sh.value = Integrate(s.components[0], mesh)
+        mass_sh.value = mass

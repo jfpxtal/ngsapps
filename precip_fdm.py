@@ -14,8 +14,8 @@ N = 7000
 dx = L / N
 
 dt = 0.05
-tend = 4000
-# tend = 1000
+# tend = 4000
+tend = -1
 
 gamma = 0.1
 alpha = 0.2
@@ -23,15 +23,14 @@ kappa = 0
 
 delta = 0.1
 
-output = True
-if output:
-    outfile = open("precip.bin", "wb")
+outfile = None
+# outfile = open("precip.bin", "wb")
 
 # kappa == 0
 diag = np.hstack((dt / (dx ** 2) + 1 + dt * gamma, np.full(N - 1, 1 + 2 * dt / (dx ** 2) + dt * gamma), dt / (dx ** 2) + 1 + dt * gamma,
                   1 + kappa * dt / (dx ** 2), np.full(N - 1, 1 + 2 * kappa * dt / (dx ** 2)), 1 + kappa * dt / (dx ** 2)))
-upper_minor = np.hstack((0, np.full(N, -dt / (dx ** 2)), 0, 0, np.full(N - 1, -kappa * dt / (dx ** 2))))
-lower_minor = np.hstack((np.full(N, -dt / (dx ** 2)), 0, np.full(N - 1, -kappa * dt / (dx ** 2)), 0, 0))
+upper_minor = np.hstack((0, np.full(N, -dt / (dx ** 2)), 0, np.full(N, -kappa * dt / (dx ** 2))))
+lower_minor = np.hstack((np.full(N, -dt / (dx ** 2)), 0, np.full(N, -kappa * dt / (dx ** 2)), 0))
 B = sp.dia_matrix((np.vstack((lower_minor, diag, upper_minor)), [-1, 0, 1]), (2 * N + 2, 2 * N + 2))
 
 cdiag = np.full(N + 1, -gamma * dt)
@@ -83,7 +82,7 @@ input("Press any key...")
 # implicit Euler
 t = 0.0
 it = 1
-while t <= tend:
+while tend < 0 or t < tend - dt / 2:
     print("\n\nt = {:10.2f}".format(t))
     # print(s)
     # if it % 200 == 0:
@@ -105,7 +104,7 @@ while t <= tend:
         ax_mass.autoscale_view()
         fig_sol.canvas.draw()
         fig_mass.canvas.draw()
-        if output:
+        if outfile:
             np.save(outfile, s)
 
     sold = np.copy(s)
@@ -132,6 +131,6 @@ while t <= tend:
     it += 1
 
 print()
-if output:
+if outfile:
     outfile.close()
 plt.show()

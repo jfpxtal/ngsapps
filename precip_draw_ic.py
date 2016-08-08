@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 N = 70
+L = 700
 alpha = 0.2
 span = 3
 interpolation = 'nearest'
@@ -127,6 +128,16 @@ class DrawIC:
         path = self.load_dialog()
         if path:
             with open(path, "rb") as infile:
+                N1 = np.load(infile)
+                N2 = np.load(infile)
+                if N1 != N or N2 != N:
+                    print('Load: number of grid points does not match')
+                    return
+                Lx = np.load(infile)
+                Ly = np.load(infile)
+                if Lx != L or Ly != L:
+                    print('Load: side length does not match')
+                    return
                 s = np.load(infile)
             self.data_c = s[:(N + 1) ** 2].reshape((N+1, N+1))
             self.data_e = s[(N + 1) ** 2:].reshape((N+1, N+1))
@@ -138,6 +149,10 @@ class DrawIC:
         path = self.save_dialog()
         if path:
             with open(path, "wb") as outfile:
+                np.save(outfile, N)
+                np.save(outfile, N)
+                np.save(outfile, L)
+                np.save(outfile, L)
                 np.save(outfile, np.hstack((self.data_c.flatten(), self.data_e.flatten())))
             print('Saved.')
 

@@ -162,7 +162,7 @@ s.components[0].Set(CoefficientFunction(0.0))
 # s.components[1].Set(CoefficientFunction(rho0))
 # s.components[1].Set(0.5 * (cos(100 * (x + y)) + 1))
 s.components[1].Set(IfPos(x,1.0,0.0))
-# s.components[2].Set(CoefficientFunction(0.0))
+s.components[2].Set(CoefficientFunction(0.0))
 # s.components[2].Set(RandomCF(0.0,1.0))
 
 if usegeo == "1d":
