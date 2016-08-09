@@ -1,21 +1,24 @@
 # http://www.math.umn.edu/~scheel/preprints/pf0.pdf
 
 from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
-from netgen.geom2d import SplineGeometry
+from netgen.geom2d import SplineGeometry, unit_square
 from netgen.csg import Pnt
 from ngsolve import *
 import matplotlib.pyplot as plt
+from ngsapps.utils import *
 
 order = 3
 
 # L = 10
 # N = 10
-L = 700
+# L = 700
+L = 200
 N = 1000
 dx = L / N
 
-tau = 0.05
-tend = 4000
+tau = 1
+# tend = 4000
+tend = -1
 
 gamma = 0.1
 alpha = 0.2
@@ -23,30 +26,20 @@ kappa = 0
 
 vtkoutput = False
 
-visgeo = SplineGeometry()
-visgeo.AddRectangle((0,0), (700,10))
-vismesh = Mesh(visgeo.GenerateMesh(maxh=5))
+geo = SplineGeometry()
+geo.AddRectangle((0,0), (200,1))
+mesh = Mesh(geo.GenerateMesh(maxh=0.5))
 
-visV = H1(vismesh, order=order)
+# geo = SplineGeometry()
+# geo.AddRectangle((0,0), (200,200))
+# mesh = Mesh(geo.GenerateMesh(maxh=10))
 
-netmesh = NetMesh()
-netmesh.dim = 1
-
-pnums = []
-for i in range(0, N + 1):
-    pnums.append(netmesh.Add(MeshPoint(Pnt(i * dx, 0, 0))))
-
-for i in range(0, N):
-    netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
-
-netmesh.Add(Element0D(pnums[0], index=1))
-netmesh.Add(Element0D(pnums[N], index=2))
-
-mesh = Mesh(netmesh)
-
-
-V = H1(mesh, order=order)
-fes = FESpace([V, V])
+# V = L2(mesh, order=order, flags={ 'dgjumps': True })
+# fes = FESpace([V, V], flags={ 'dgjumps': True })
+Vc = L2(mesh, dirichlet=[], order=order)
+Ve = L2(mesh, dirichlet=[], order=order)
+fes = FESpace([Vc, Ve], flags={ 'dgjumps': True })
+# fes = FESpace([Vc, Ve])
 c, e = fes.TrialFunction()
 tc, te = fes.TestFunction()
 
@@ -58,17 +51,32 @@ a += SymbolicBFI(kappa * grad(e) * grad(te))
 a += SymbolicBFI(-e * (1 - e) * (e - alpha) * te)
 a += SymbolicBFI(-gamma * c * te)
 
+n = specialcf.normal(mesh.dim)
+h = specialcf.mesh_size
+
+d = BilinearForm(fes)
+d += SymbolicBFI(0.5 * (grad(c) + grad(c.Other())) * n * (tc - tc.Other()), VOL, skeleton=True)
+d += SymbolicBFI(0.5 * (grad(tc) + grad(tc.Other())) * n * (c - c.Other()), VOL, skeleton=True)
+d += SymbolicBFI(-10 * order * (order+1) / h * (c - c.Other()) * (tc - tc.Other()), VOL, skeleton=True)
+
+# a += SymbolicBFI(kappa * 0.5 * (grad(e) + grad(e.Other())) * n * (te - te.Other()), VOL, skeleton=True)
+# a += SymbolicBFI(kappa * 0.5 * (grad(te) + grad(te.Other())) * n * (e - e.Other()), VOL, skeleton=True)
+# a += SymbolicBFI(kappa * 10 * order * (order+1) / h * (e - e.Other()) * (te - te.Other()), VOL, skeleton=True)
+
 b = BilinearForm(fes)
 b += SymbolicBFI(c * tc)
 b += SymbolicBFI(e * te)
 
 b.Assemble()
+d.Assemble()
 
 mstar = b.mat.CreateMatrix()
 
 s = GridFunction(fes)
 
-s.components[0].Set(IfPos(20 - x, 0.1, 0))
+# width = 1
+# s.components[0].Set(0.1 * exp(-((x-100) * (x-100) + (y-100) * (y-100)) / width))
+s.components[0].Set(IfPos(0.1 - x, 0.1, 0))
 s.components[1].Set(CoefficientFunction(alpha))
 
 rhs = s.vec.CreateVector()
@@ -77,7 +85,7 @@ As = s.vec.CreateVector()
 w = s.vec.CreateVector()
 
 if vtkoutput:
-    vtk = VTKOutput(ma=mesh,coefs=[s.components[1],s.components[0]],names=["e","c"],filename="precipitation_",subdivision=3)
+    vtk = VTKOutput(ma=mesh,coefs=[s.components[1],s.components[0]],names=["e","c"],filename="precipfem_",subdivision=3)
     vtk.Do()
 
 xs = [i * dx for i in range(0, N + 1)]
@@ -86,53 +94,56 @@ ts = [0]
 def get_vals(u):
     return [u(x) for x in xs]
 
-fig_sol = plt.figure()
+# fig_sol = plt.figure()
 
-ax_e = fig_sol.add_subplot(211)
-line_e, = ax_e.plot(xs, get_vals(s.components[1]), "b", label="e")
-ax_e.legend()
+# ax_e = fig_sol.add_subplot(211)
+# line_e, = ax_e.plot(xs, get_vals(s.components[1]), "b", label="e")
+# ax_e.legend()
 
-ax_c = fig_sol.add_subplot(212)
-line_c, = ax_c.plot(xs, get_vals(s.components[0]), "b", label="c")
-ax_c.legend()
+# ax_c = fig_sol.add_subplot(212)
+# line_c, = ax_c.plot(xs, get_vals(s.components[0]), "b", label="c")
+# ax_c.legend()
 
-fig_mass = plt.figure()
-ax_mass = fig_mass.add_subplot(111)
-masses = [Integrate(s.components[0], mesh) + Integrate(s.components[1], mesh)]
-line_mass, = ax_mass.plot(ts, masses, "g", label=r"$\int\;c + e$")
-ax_mass.legend()
+# fig_mass = plt.figure()
+# ax_mass = fig_mass.add_subplot(111)
+# masses = [Integrate(s.components[0], mesh) + Integrate(s.components[1], mesh)]
+# line_mass, = ax_mass.plot(ts, masses, "g", label=r"$\int\;c + e$")
+# ax_mass.legend()
 
-plt.show(block=False)
+# plt.show(block=False)
 
-visfun = GridFunction(visV)
-visfun.Set(s.components[1])
-Draw(visfun, vismesh, "e")
+# visfun = GridFunction(visV)
+# visfun.Set(s.components[1])
+# Draw(visfun, vismesh, "e")
+
+Draw(s.components[0], mesh, "c")
+Draw(s.components[1], mesh, "e")
 
 
 input("Press any key...")
 # implicit Euler
 t = 0.0
 it = 1
-while t < tend:
+while tend < 0 or t < tend:
     print("\n\nt = {:10.2f}".format(t))
-    if it % 100 == 0:
-        print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    # if it % 100 == 0:
+    #     print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
 
-        visfun.Set(s.components[1])
-        line_e.set_ydata(get_vals(s.components[1]))
-        line_c.set_ydata(get_vals(s.components[0]))
-        ax_e.relim()
-        ax_e.autoscale_view()
-        ax_c.relim()
-        ax_c.autoscale_view()
-        ts.append(t)
-        masses.append(Integrate(s.components[0], mesh) + Integrate(s.components[1], mesh))
-        line_mass.set_xdata(ts)
-        line_mass.set_ydata(masses)
-        ax_mass.relim()
-        ax_mass.autoscale_view()
-        fig_sol.canvas.draw()
-        fig_mass.canvas.draw()
+    #     # visfun.Set(s.components[1])
+    #     line_e.set_ydata(get_vals(s.components[1]))
+    #     line_c.set_ydata(get_vals(s.components[0]))
+    #     ax_e.relim()
+    #     ax_e.autoscale_view()
+    #     ax_c.relim()
+    #     ax_c.autoscale_view()
+    #     ts.append(t)
+    #     masses.append(Integrate(s.components[0], mesh) + Integrate(s.components[1], mesh))
+    #     line_mass.set_xdata(ts)
+    #     line_mass.set_ydata(masses)
+    #     ax_mass.relim()
+    #     ax_mass.autoscale_view()
+    #     fig_sol.canvas.draw()
+    #     fig_mass.canvas.draw()
 
     sold.data = s.vec
     wnorm = 1e99
@@ -141,11 +152,14 @@ while t < tend:
     while wnorm > 1e-9:
         rhs.data = b.mat * sold
         rhs.data -= b.mat * s.vec
-        a.Apply(s.vec,As)
+        rhs.data -= tau * d.mat * s.vec
+        a.Apply(s.vec, As)
         rhs.data -= tau * As
         a.AssembleLinearization(s.vec)
 
-        mstar.AsVector().data = b.mat.AsVector() + tau * a.mat.AsVector()
+        mstar.AsVector().data = b.mat.AsVector()
+        mstar.AsVector().data += tau * a.mat.AsVector()
+        mstar.AsVector().data += tau * d.mat.AsVector()
         invmat = mstar.Inverse()
         w.data = invmat * rhs
         wnorm = w.Norm()
