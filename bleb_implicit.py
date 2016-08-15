@@ -122,9 +122,6 @@ V = H1(mesh, order=order)
 fes = FESpace([UV, V, V])
 u, rho, mu = fes.TrialFunction()
 tu, trho, tmu = fes.TestFunction()
-# fes = FESpace([V, V])
-# u, rho = fes.TrialFunction()
-# tu, trho = fes.TestFunction()
 
 a = BilinearForm(fes)
 

@@ -118,7 +118,7 @@ print("Phase 1: localize t_stat\n")
 
 t = 0.0
 it = 1
-tau = 1e-10
+tau = 1
 stat_mass_ratio = 0.1
 f = 1e-10
 
@@ -207,7 +207,7 @@ m_max = 10
 f_min = 1e-10
 f_max = 1e5
 f_tol = 1e-3
-additional_steps = 4
+additional_steps = 10
 
 it_bin_search = 0
 stable = True
@@ -231,7 +231,7 @@ while not stable or f_max - f_min > f_tol:
     stable = True
     stationary = False
     t = 0
-    for it in range(1, steps_to_tstat + 1):
+    for it in range(1, 3 * steps_to_tstat + 1):
         t += tau
         d.Assemble()
 
@@ -243,14 +243,16 @@ while not stable or f_max - f_min > f_tol:
         s.vec.data = invmat * rhs
         print("it = {}\tt = {:.3g}".format(it, t))
 
-    with TaskManager():
-        mass_old = Integrate(s.components[0], mesh)
+        with TaskManager():
+            mass_old = Integrate(s.components[0], mesh)
 
-    if math.isnan(mass_old):
-        # instability, pressure too high
-        print("\nInstability")
-        stable = False
-    else:
+        if math.isnan(mass_old):
+            # instability, pressure too high
+            print("\nInstability")
+            stable = False
+            break
+
+    if stable:
         print("\nmass_old = {:.3e}\n".format(mass_old))
         for it in range(1, additional_steps + 1):
             t += tau
