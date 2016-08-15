@@ -3,7 +3,6 @@
 #include <python_ngstd.hpp>
 #include "myvtkoutput.hpp"
 #include "randomcf.hpp"
-#include "racecond.cpp"
 
 using namespace ngfem;
 
@@ -80,8 +79,6 @@ void ExportNgsAppsUtils()
                                }))
 
     ;
-  bp::class_<RaceCond>("RaceCond", bp::init<>())
-    .def("Do", &RaceCond::Do);
 }
 
 BOOST_PYTHON_MODULE(libngsapps_utils)
