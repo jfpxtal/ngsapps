@@ -37,7 +37,7 @@ namespace ngcomp
     string grid_str;
     int subdivision;
     int only_element = -1;
-    bool nocash;
+    bool nocache;
 
     Array<IntegrationPoint> ref_vertices;
     Array<INT<D+1>> ref_elements;

@@ -11,7 +11,7 @@ namespace ngcomp
                   flags.GetStringFlag("filename","output"),
                   (int) flags.GetNumFlag("subdivision", 0),
                   (int) flags.GetNumFlag("only_element", -1),
-                  flags.GetDefineFlag("nocash"))
+                  flags.GetDefineFlag("nocache"))
   {;}
 
   template <int D>
@@ -19,13 +19,13 @@ namespace ngcomp
                              const Array<shared_ptr<CoefficientFunction>> & a_coefs,
                              const Array<string> & a_field_names,
                              string a_filename, int a_subdivision,
-                             int a_only_element, bool a_nocash)
+                             int a_only_element, bool a_nocache)
     : ma(ama), coefs(a_coefs), fieldnames(a_field_names),
       filename(a_filename), subdivision(a_subdivision),
-      only_element(a_only_element), nocash(a_nocash)
+      only_element(a_only_element), nocache(a_nocache)
   {
     FillReferenceData();
-    if (! nocash)
+    if (! nocache)
       BuildGridString();
     value_field.SetSize(a_coefs.Size());
     for (int i = 0; i < a_coefs.Size(); i++)
@@ -89,7 +89,7 @@ namespace ngcomp
       {
         if (maybewarn)
         {
-          cout << endl << "Warning: VTKOutput: subdivision not implemented for element types other than trigs / tets" << endl;
+          cout << endl << " Warning: VTKOutput: subdivision not implemented for element types other than trigs / tets" << endl;
           maybewarn = false;
         }
         auto vertices = el.Vertices();
@@ -292,7 +292,7 @@ namespace ngcomp
 
     output_cnt++;
 
-    if (nocash)
+    if (nocache)
       BuildGridString();
 
     fileout << grid_str;
