@@ -37,6 +37,7 @@ namespace ngcomp
     string grid_str;
     int subdivision;
     int only_element = -1;
+    bool nocash;
 
     Array<IntegrationPoint> ref_vertices;
     Array<INT<D+1>> ref_elements;
@@ -44,20 +45,18 @@ namespace ngcomp
 
     int output_cnt = 0;
 
-    shared_ptr<ofstream> fileout;
-
   public:
 
     MyVTKOutput(const Array<shared_ptr<CoefficientFunction>> &,
-               const Flags &,shared_ptr<MeshAccess>);
+                const Flags &, shared_ptr<MeshAccess>);
 
     MyVTKOutput(shared_ptr<MeshAccess>, const Array<shared_ptr<CoefficientFunction>> &,
-               const Array<string> &, string, int, int);
+                const Array<string> &, string, int, int, bool);
 
     static int ElementTypeToVTKType(int et);
     virtual void BuildGridString();
     void FillReferenceData();
-    void PrintFieldData();
+    void PrintFieldData(ofstream &);
 
     virtual void Do(LocalHeap & lh, const BitArray * drawelems = 0);
   };
@@ -67,15 +66,15 @@ namespace ngcomp
   protected:
     shared_ptr<MyBaseVTKOutput> vtkout = nullptr;
   public:
-    NumProcMyVTKOutput (shared_ptr<PDE> apde, const Flags & flags);
+    NumProcMyVTKOutput(shared_ptr<PDE> apde, const Flags & flags);
     virtual ~NumProcMyVTKOutput() { }
 
-    virtual string GetClassName () const
+    virtual string GetClassName() const
       {
         return "NumProcMyVTKOutput";
       }
 
-    virtual void Do (LocalHeap & lh);
+    virtual void Do(LocalHeap & lh);
   };
 
 }

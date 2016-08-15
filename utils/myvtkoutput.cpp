@@ -4,25 +4,29 @@ namespace ngcomp
 {
   template <int D>
   MyVTKOutput<D>::MyVTKOutput(const Array<shared_ptr<CoefficientFunction>> & a_coefs,
-                           const Flags & flags,
-                           shared_ptr<MeshAccess> ama )
+                              const Flags & flags,
+                              shared_ptr<MeshAccess> ama)
     : MyVTKOutput(ama, a_coefs,
-                flags.GetStringListFlag ("fieldnames" ),
-                flags.GetStringFlag ("filename","output"),
-                (int) flags.GetNumFlag ( "subdivision", 0),
-                (int) flags.GetNumFlag ( "only_element", -1))
+                  flags.GetStringListFlag("fieldnames" ),
+                  flags.GetStringFlag("filename","output"),
+                  (int) flags.GetNumFlag("subdivision", 0),
+                  (int) flags.GetNumFlag("only_element", -1),
+                  flags.GetDefineFlag("nocash"))
   {;}
 
   template <int D>
   MyVTKOutput<D>::MyVTKOutput(shared_ptr<MeshAccess> ama,
-                           const Array<shared_ptr<CoefficientFunction>> & a_coefs,
-                           const Array<string> & a_field_names,
-                           string a_filename, int a_subdivision, int a_only_element)
+                             const Array<shared_ptr<CoefficientFunction>> & a_coefs,
+                             const Array<string> & a_field_names,
+                             string a_filename, int a_subdivision,
+                             int a_only_element, bool a_nocash)
     : ma(ama), coefs(a_coefs), fieldnames(a_field_names),
-      filename(a_filename), subdivision(a_subdivision), only_element(a_only_element)
+      filename(a_filename), subdivision(a_subdivision),
+      only_element(a_only_element), nocash(a_nocash)
   {
     FillReferenceData();
-    BuildGridString();
+    if (! nocash)
+      BuildGridString();
     value_field.SetSize(a_coefs.Size());
     for (int i = 0; i < a_coefs.Size(); i++)
       if (fieldnames.Size() > i)
@@ -85,7 +89,7 @@ namespace ngcomp
       {
         if (maybewarn)
         {
-          cout << "Warning: VTKOutput: subdivision not implemented for element types other than trigs / tets" << endl;
+          cout << endl << "Warning: VTKOutput: subdivision not implemented for element types other than trigs / tets" << endl;
           maybewarn = false;
         }
         auto vertices = el.Vertices();
@@ -239,18 +243,18 @@ namespace ngcomp
 
   /// output of field data (coefficient values)
   template <int D>
-  void MyVTKOutput<D>::PrintFieldData()
+  void MyVTKOutput<D>::PrintFieldData(ofstream & fileout)
   {
-    *fileout << "FIELD FieldData " << value_field.Size() << endl;
+    fileout << "FIELD FieldData " << value_field.Size() << endl;
 
     for (auto field : value_field)
     {
-      *fileout << field->Name() << " "
+      fileout << field->Name() << " "
                << field->Dimension() << " "
                << field->Size()/field->Dimension() << " float" << endl;
       for (auto v : *field)
-        *fileout << v << " ";
-      *fileout << endl;
+        fileout << v << " ";
+      fileout << endl;
     }
   }
 
@@ -273,34 +277,38 @@ namespace ngcomp
   }
 
   template <int D>
-  void MyVTKOutput<D>::Do (LocalHeap & lh, const BitArray * drawelems)
+  void MyVTKOutput<D>::Do(LocalHeap & lh, const BitArray * drawelems)
   {
     ostringstream filenamefinal;
     filenamefinal << filename;
     if (output_cnt > 0)
       filenamefinal << "_" << output_cnt;
     filenamefinal << ".vtk";
-    fileout = make_shared<ofstream>(filenamefinal.str());
+    ofstream fileout(filenamefinal.str());
     cout << " Writing VTK-Output";
     if (output_cnt > 0)
       cout << " ( " << output_cnt << " )";
     cout << ":" << flush;
 
     output_cnt++;
-    *fileout << grid_str;
+
+    if (nocash)
+      BuildGridString();
+
+    fileout << grid_str;
 
     int ne = ma->GetNE();
 
     IntRange range = only_element >= 0 ? IntRange(only_element,only_element+1) : Range(ne);
 
-    for ( int elnr : range)
+    for (int elnr : range)
     {
       if (drawelems && !(drawelems->Test(elnr)))
           continue;
 
       HeapReset hr(lh);
 
-      ElementTransformation & eltrans = ma->GetTrafo (elnr, 0, lh);
+      ElementTransformation & eltrans = ma->GetTrafo(elnr, 0, lh);
       auto el = ma->GetElement(elnr);
       ELEMENT_TYPE et = el.GetType();
       if (et == ET_TRIG || et == ET_TET)
@@ -339,7 +347,7 @@ namespace ngcomp
 
     }
 
-    PrintFieldData();
+    PrintFieldData(fileout);
 
     for (auto field : value_field)
       field->SetSize(0);
@@ -347,14 +355,14 @@ namespace ngcomp
     cout << " Done." << endl;
   }
 
-  NumProcMyVTKOutput::NumProcMyVTKOutput (shared_ptr<PDE> apde, const Flags & flags)
-    : NumProc (apde)
+  NumProcMyVTKOutput::NumProcMyVTKOutput(shared_ptr<PDE> apde, const Flags & flags)
+    : NumProc(apde)
   {
     const Array<string> & coefs_strings = flags.GetStringListFlag ("coefficients");
 
     Array<shared_ptr<CoefficientFunction>> coefs;
     for (int i = 0; i < coefs_strings.Size(); ++i)
-      coefs.Append(apde->GetCoefficientFunction (coefs_strings[i]));
+      coefs.Append(apde->GetCoefficientFunction(coefs_strings[i]));
 
     if (apde->GetMeshAccess()->GetDimension() == 2)
       vtkout = make_shared<MyVTKOutput<2>>(coefs, flags, apde->GetMeshAccess());
@@ -363,7 +371,7 @@ namespace ngcomp
   }
 
 
-  void NumProcMyVTKOutput::Do (LocalHeap & lh)
+  void NumProcMyVTKOutput::Do(LocalHeap & lh)
   {
     vtkout->Do(lh);
   }

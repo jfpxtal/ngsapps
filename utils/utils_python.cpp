@@ -33,7 +33,8 @@ void ExportNgsAppsUtils()
   bp::class_<MyBaseVTKOutput, shared_ptr<MyBaseVTKOutput>,  boost::noncopyable>("MyVTKOutput", bp::no_init)
     .def("__init__", bp::make_constructor
          (FunctionPointer ([](shared_ptr<MeshAccess> ma, bp::list coefs_list,
-                              bp::list names_list, string filename, int subdivision, int only_element)
+                              bp::list names_list, string filename, int subdivision,
+                              int only_element, bool nocash)
                            {
                              Array<shared_ptr<CoefficientFunction> > coefs
                                = makeCArray<shared_ptr<CoefficientFunction>> (coefs_list);
@@ -41,9 +42,9 @@ void ExportNgsAppsUtils()
                                = makeCArray<string> (names_list);
                              shared_ptr<MyBaseVTKOutput> ret;
                              if (ma->GetDimension() == 2)
-                               ret = make_shared<MyVTKOutput<2>> (ma, coefs, names, filename, subdivision, only_element);
+                              ret = make_shared<MyVTKOutput<2>>(ma, coefs, names, filename, subdivision, only_element, nocash);
                              else
-                               ret = make_shared<MyVTKOutput<3>> (ma, coefs, names, filename, subdivision, only_element);
+                              ret = make_shared<MyVTKOutput<3>>(ma, coefs, names, filename, subdivision, only_element, nocash);
                              return ret;
                            }),
 
@@ -54,7 +55,8 @@ void ExportNgsAppsUtils()
             bp::arg("names") = bp::list(),
             bp::arg("filename") = "vtkout",
             bp::arg("subdivision") = 0,
-            bp::arg("only_element") = -1
+            bp::arg("only_element") = -1,
+            bp::arg("nocash") = false
             )
            )
       )
