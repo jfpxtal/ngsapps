@@ -50,7 +50,6 @@ namespace ngcomp
     Array<Array<int>> cells;
     Array<int> cell_types;
     int pointcnt = 0;
-    int total_cell_nums = 0;
     LocalHeap lh(1000000);
     bool maybewarn = subdivision != 0;
     for (int elnr : range)

@@ -178,9 +178,6 @@ if usegeo == "1d":
     plt.show(block=False)
 
 rhs = s.vec.CreateVector()
-sold = s.vec.CreateVector()
-As = s.vec.CreateVector()
-w = s.vec.CreateVector()
 
 Draw(s.components[2], mesh, "mu")
 Draw(s.components[1], mesh, "rho")
