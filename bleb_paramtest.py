@@ -22,9 +22,9 @@ kon = 1 # 1 / s
 koff = 1 # 1 / s
 # linker bond length
 delta = 1 # m
-# density of available linkers
-rho0 = 0 # 1 / m^2
-# # cortical stress
+# # density of available linkers
+# rho0 = 0 # 1 / m^2
+# # # cortical stress
 # f = 5e4 # N / m
 
 # temperature
@@ -64,9 +64,6 @@ V = H1(mesh, order=order)
 fes = FESpace([UV, V, V])
 u, rho, mu = fes.TrialFunction()
 tu, trho, tmu = fes.TestFunction()
-# fes = FESpace([V, V])
-# u, rho = fes.TrialFunction()
-# tu, trho = fes.TestFunction()
 
 a = BilinearForm(fes)
 
@@ -120,9 +117,9 @@ print("Testing k = {}\tkon = {}\tkoff = {}\tkappa = {}\tgamma = {}\n\n".format(k
 print("Phase 1: localize t_stat\n")
 
 t = 0.0
-it = 0
+it = 1
 tau = 1e-10
-stat_mass_ratio = 0.01
+stat_mass_ratio = 0.1
 f = 1e-10
 
 l = LinearForm(fes)
@@ -147,8 +144,8 @@ while True:
         mass = Integrate(s.components[0], mesh)
 
     mass_change = math.fabs(mass - mass_old)
-    print("it = {}\tt = {}\ttau = {}\tmass = {:5.3e}\tchange = {:5.3e}\n".format(it, t, tau, mass, mass_change))
-    if it > 0 and mass_change < stat_mass_ratio * mass:
+    print("it = {}\tt = {:.3g}\ttau = {}\tmass = {:.3e}\tchange = {:.3e}\n".format(it, t, tau, mass, mass_change))
+    if it > 1 and mass_change < stat_mass_ratio * mass:
         break
 
     mass_old = mass
@@ -159,7 +156,7 @@ t_stat_min = t - tau
 t_stat_max = t
 t_stat_tol = 1
 
-print("\nFinished phase 1: t_stat_min = {}\tt_stat_max = {}\n".format(t_stat_min, t_stat_max))
+print("\nFinished phase 1: t_stat_min = {:.3g}\tt_stat_max = {:.3g}\n".format(t_stat_min, t_stat_max))
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 print("Phase 2: binary search for t_stat\n")
 
@@ -182,7 +179,7 @@ while t_stat_max - t_stat_min > t_stat_tol:
         mass = Integrate(s.components[0], mesh)
 
     mass_change = math.fabs(mass - mass_old)
-    print("it_bin_search = {}\tt_stat_min = {}\tt_stat_max = {}\tt_stat = {}\tmass = {:5.3e}\tchange = {:5.3e}".format(it_bin_search, t_stat_min, t_stat_max, t_stat, mass, mass_change))
+    print("it_bin_search = {}\tt_stat_min = {:.3g}\tt_stat_max = {:.3g}\tt_stat = {:.3g}\tmass = {:.3e}\tchange = {:.3e}".format(it_bin_search, t_stat_min, t_stat_max, t_stat, mass, mass_change))
     if mass_change < stat_mass_ratio * mass:
         print("t_stat < t\n")
         t_stat_max = t_stat
@@ -195,10 +192,11 @@ while t_stat_max - t_stat_min > t_stat_tol:
     it_bin_search += 1
 
 # t_stat = t
-tau = t_stat / 2
+steps_to_tstat = 5
+tau = t_stat / steps_to_tstat
 mass_stat = [mass]
 
-print("\nFinished phase 2: t_stat = {}\ttau = {:5.3e}\tmass_stat = {:5.3e}\n".format(t_stat, tau, mass))
+print("\nFinished phase 2: t_stat = {:.3g}\ttau = {:.3e}\tmass_stat = {:.3e}\n".format(t_stat, tau, mass))
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 print("Phase 3: binary search for critical pressure\n")
 
@@ -207,7 +205,7 @@ e_max = 10
 m_min = 0
 m_max = 10
 f_min = 1e-10
-f_max = 1e10
+f_max = 1e5
 f_tol = 1e-3
 additional_steps = 4
 
@@ -216,13 +214,13 @@ stable = True
 while not stable or f_max - f_min > f_tol:
 # while not stable or e_max > e_min or m_max - m_min > 1:
     f = (f_max + f_min) / 2
-    print("it_bin_search = {}\tf_min = {:5.3e}\tf_max = {:5.3e}\tf = {:5.3e}\n".format(it_bin_search, f_min, f_max, f))
+    print("it_bin_search = {}\tf_min = {:.3e}\tf_max = {:.3e}\tf = {:.3e}\n".format(it_bin_search, f_min, f_max, f))
     # exponent = math.floor((e_max + e_min) / 2)
     # mant = (m_max + m_min) / 2
     # f = mant * 10 ** exponent
     # f_min = m_min * 10 ** e_min
     # f_max = m_max * 10 ** e_max
-    # print("it_bin_search = {}\te_min = {}\te_max = {}\tm_min = {}\tm_max = {}\tf = {:5.3e}\n".format(it_bin_search, e_min, e_max, m_min, m_max, f))
+    # print("it_bin_search = {}\te_min = {}\te_max = {}\tm_min = {}\tm_max = {}\tf = {:.3e}\n".format(it_bin_search, e_min, e_max, m_min, m_max, f))
 
     l = LinearForm(fes)
     l += SymbolicLFI(f * tu)
@@ -230,11 +228,11 @@ while not stable or f_max - f_min > f_tol:
     l.Assemble()
 
     s.vec.data = s_init
-    t = 0
-    it = 0
-    mass_old = 0
     stable = True
-    while t <= t_stat + additional_steps * tau:
+    stationary = False
+    t = 0
+    for it in range(1, steps_to_tstat + 1):
+        t += tau
         d.Assemble()
 
         rhs.data = b.mat * s.vec
@@ -243,40 +241,59 @@ while not stable or f_max - f_min > f_tol:
         mstar.AsVector().data = b.mat.AsVector() + c.mat.AsVector() - tau * (a.mat.AsVector() + d.mat.AsVector())
         invmat = mstar.Inverse(fes.FreeDofs())
         s.vec.data = invmat * rhs
+        print("it = {}\tt = {:.3g}".format(it, t))
+
+    with TaskManager():
+        mass_old = Integrate(s.components[0], mesh)
+
+    if math.isnan(mass_old):
+        # instability, pressure too high
+        print("\nInstability")
+        stable = False
+    else:
+        print("\nmass_old = {:.3e}\n".format(mass_old))
+        for it in range(1, additional_steps + 1):
+            t += tau
+            d.Assemble()
+
+            rhs.data = b.mat * s.vec
+            rhs.data += tau * l.vec
+
+            mstar.AsVector().data = b.mat.AsVector() + c.mat.AsVector() - tau * (a.mat.AsVector() + d.mat.AsVector())
+            invmat = mstar.Inverse(fes.FreeDofs())
+            s.vec.data = invmat * rhs
+            print("it = {}\tt = {:.3g}".format(it, t))
 
         with TaskManager():
             mass = Integrate(s.components[0], mesh)
 
         if math.isnan(mass):
             # instability, pressure too high
-            print("Instability f = {:5.3e}\tt = {}\n".format(f, t))
+            print("\nInstability")
             stable = False
-            break
-
-        mass_change = math.fabs(mass - mass_old)
-        print("it = {}\tt = {}\tf = {:5.3e}\tmass = {:5.3e}\tchange = {:5.3e}\n".format(it, t, f, mass, mass_change))
-        if it > 0 and mass_change < stat_mass_ratio * mass:
-            print("Stationary point reached: f = {:5.3e}\tmass = {:5.3e}\tt = {}".format(f, mass, t))
-            break
-
-        mass_old = mass
-        t += tau
-        it += 1
+        else:
+            mass_change = math.fabs(mass - mass_old)
+            print("\nmass = {:.3e}\tchange = {:.3e}\n".format(mass, mass_change))
+            if mass_change < stat_mass_ratio * mass:
+                print("Mass is stationary")
+                stationary = True
+            else:
+                print("Mass is NOT stationary")
 
     mass_stat.append(mass)
-    if not stable or t > t_stat + additional_steps * tau:
-        print("f_crit < f")
-        # if e_max == e_min:
-        #     m_max = mant
-        # e_max = exponent
-        f_max = f
-    else:
-        print("f < f_crit")
+    if stable and stationary:
+        print("f < f_crit\n\n")
         # if e_max == e_min:
         #     m_min = mant
         # e_min = exponent
         f_min = f
+    else:
+        print("f_crit < f\n\n")
+        # if e_max == e_min:
+        #     m_max = mant
+        # e_max = exponent
+        f_max = f
 
     it_bin_search += 1
 
-print("\n\nFinished: f_crit = {:5.3e}\tf_min = {:5.3e}\tf_max = {:5.3e}".format(f, f_min, f_max))
+print("\n\nFinished: f_crit = {:.3e}\tf_min = {:.3e}\tf_max = {:.3e}\tt_stat = {:.3g}".format(f, f_min, f_max, t_stat))

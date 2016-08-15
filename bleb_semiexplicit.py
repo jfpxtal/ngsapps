@@ -118,9 +118,6 @@ V = H1(mesh, order=order)
 fes = FESpace([UV, V, V])
 u, rho, mu = fes.TrialFunction()
 tu, trho, tmu = fes.TestFunction()
-# fes = FESpace([V, V])
-# u, rho = fes.TrialFunction()
-# tu, trho = fes.TestFunction()
 
 a = BilinearForm(fes)
 
@@ -224,8 +221,8 @@ input("Press any key...")
 # implicit Euler
 t = 0.0
 it = 0
-while tend < 0 or t < tend - dt / 2:
-    print("\n\nt = {:10.6e}".format(t))
+while tend < 0 or t < tend - tau / 2:
+    print("\nt = {:10.6e}".format(t))
     if usegeo == "1d" and it % 50 == 0:
         line_u.set_ydata(get_vals(s.components[0]))
         ax_u.relim()
@@ -253,6 +250,7 @@ while tend < 0 or t < tend - dt / 2:
         vtk.Do()
     with TaskManager():
         mass = Integrate(s.components[0], mesh)
+    print("mass = {:.3e}".format(mass))
     with t_sh.get_lock(), mass_sh.get_lock():
         t_sh.value = t
         mass_sh.value = mass
