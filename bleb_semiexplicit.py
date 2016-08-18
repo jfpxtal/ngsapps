@@ -16,7 +16,7 @@ maxh = 0.1
 initial_roughness = 20.0
 
 # time step and end
-tau = 1e0
+tau = 0.5
 tend = -1
 
 # # stiffness of linker proteins
@@ -52,7 +52,10 @@ delta = 1 # m
 # density of available linkers
 rho0 = 0 # 1 / m^2
 # cortical stress
-f = 2e-1 # N / m
+f = 3e-1 # N / m
+
+# velocity of pressure pulse
+vf = 0.05
 
 # temperature
 T = 1 # K
@@ -97,6 +100,12 @@ if usegeo == "circle":
     mesh.Curve(order)
 elif usegeo == "square":
     mesh = Mesh(unit_square.GenerateMesh(maxh=maxh))
+elif usegeo == "rect":
+    Lx = 10
+    Ly = 4
+    geo = SplineGeometry()
+    geo.AddRectangle((0,0), (10,4))
+    mesh = Mesh(geo.GenerateMesh(maxh=0.3))
 elif usegeo == "1d":
     netmesh = NetMesh()
     netmesh.dim = 1
@@ -133,6 +142,10 @@ b += SymbolicBFI(rho * trho)
 c = BilinearForm(fes)
 c += SymbolicBFI(grad(u) * grad(tmu))
 c += SymbolicBFI(mu * tmu)
+
+# f = CoefficientFunction(IfPos((x-0.4)*(0.6-x), IfPos((y-0.4)*(0.6-y),3e-1,0),0))
+# width = 0.5
+# f = CoefficientFunction(3e-1*exp(-(sqr(x) + sqr(y-Ly/2)) / width))
 
 l = LinearForm(fes)
 l += SymbolicLFI(f * tu)
@@ -223,6 +236,7 @@ t = 0.0
 it = 0
 while tend < 0 or t < tend - tau / 2:
     print("\nt = {:10.6e}".format(t))
+    t += tau
     if usegeo == "1d" and it % 50 == 0:
         line_u.set_ydata(get_vals(s.components[0]))
         ax_u.relim()
@@ -233,6 +247,13 @@ while tend < 0 or t < tend - tau / 2:
         fig.canvas.draw_idle()
         plt.pause(0.05)
 
+    # f = CoefficientFunction(1e-1*exp(-(sqr(x - t * vf) + sqr(y-Ly/2)) / width))
+
+    # l = LinearForm(fes)
+    # l += SymbolicLFI(f * tu)
+    # l += SymbolicLFI(kon * trho)
+
+    # l.Assemble()
     d.Assemble()
 
     rhs.data = b.mat * s.vec
@@ -243,7 +264,6 @@ while tend < 0 or t < tend - tau / 2:
     invmat = mstar.Inverse(fes.FreeDofs())
     s.vec.data = invmat * rhs
 
-    t += tau
     it += 1
     Redraw(blocking=False)
     if vtkoutput:
