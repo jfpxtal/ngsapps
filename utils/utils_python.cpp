@@ -12,24 +12,28 @@ void ExportNgsAppsUtils()
 
   // Export RandomCoefficientFunction to python (name "RandomCF")
 
-  bp::class_<RandomCoefficientFunction, shared_ptr<RandomCoefficientFunction>, bp::bases<CoefficientFunction>, boost::noncopyable>("RandomCF", bp::no_init)
+  typedef PyWrapper<CoefficientFunction> PyCF;
+  typedef PyWrapperDerived<RandomCoefficientFunction,CoefficientFunction> PyRCF;
+
+  bp::class_<PyRCF, bp::bases<PyCF>>
+    ("RandomCF", bp::no_init)
     .def("__init__", bp::make_constructor
          (FunctionPointer ([](double lower, double upper)
                            {
-                             return make_shared<RandomCoefficientFunction> (lower, upper);
+                             return new PyRCF(make_shared<RandomCoefficientFunction> (lower, upper));
                            }),
-          bp::default_call_policies(),        // need it to use named arguments
-          (bp::arg("lower_bound")=0.0,bp::arg("upper_bound")=1.0)
-           ));
+          bp::default_call_policies(),        // need it to use arguments
+          (bp::arg("lower")=0.01, bp::arg("upper")=1.0))
+      );
+  
 
   REGISTER_PTR_TO_PYTHON_BOOST_1_60_FIX(shared_ptr<RandomCoefficientFunction>);
-
-  bp::implicitly_convertible
-    <shared_ptr<RandomCoefficientFunction>, shared_ptr<CoefficientFunction> >();
 
   using namespace ngcomp;
 
   REGISTER_PTR_TO_PYTHON_BOOST_1_60_FIX(shared_ptr<MyBaseVTKOutput>);
+
+ 
   bp::class_<MyBaseVTKOutput, shared_ptr<MyBaseVTKOutput>,  boost::noncopyable>("MyVTKOutput", bp::no_init)
     .def("__init__", bp::make_constructor
          (FunctionPointer ([](shared_ptr<MeshAccess> ma, bp::list coefs_list,
@@ -42,9 +46,9 @@ void ExportNgsAppsUtils()
                                = makeCArray<string> (names_list);
                              shared_ptr<MyBaseVTKOutput> ret;
                              if (ma->GetDimension() == 2)
-                              ret = make_shared<MyVTKOutput<2>>(ma, coefs, names, filename, subdivision, only_element, nocache);
+                               ret = make_shared<MyVTKOutput<2>>(ma, coefs, names, filename, subdivision, only_element, nocache);
                              else
-                              ret = make_shared<MyVTKOutput<3>>(ma, coefs, names, filename, subdivision, only_element, nocache);
+                               ret = make_shared<MyVTKOutput<3>>(ma, coefs, names, filename, subdivision, only_element, nocache);
                              return ret;
                            }),
 
@@ -74,9 +78,9 @@ void ExportNgsAppsUtils()
                                }),
          (bp::arg("self"),bp::arg("drawelems"),bp::arg("heapsize")=1000000))
     .def("UpdateMesh", FunctionPointer([](MyBaseVTKOutput & self)
-                               {
-                                 self.BuildGridString();
-                               }))
+                                       {
+                                         self.BuildGridString();
+                                       }))
 
     ;
 }
