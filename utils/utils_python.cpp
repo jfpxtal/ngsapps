@@ -23,7 +23,7 @@ void ExportNgsAppsUtils()
                              return new PyRCF(make_shared<RandomCoefficientFunction> (lower, upper));
                            }),
           bp::default_call_policies(),        // need it to use arguments
-          (bp::arg("lower")=0.01, bp::arg("upper")=1.0))
+          (bp::arg("lower")=0.0, bp::arg("upper")=1.0))
       );
   
 
