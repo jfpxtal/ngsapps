@@ -7,7 +7,7 @@ from netgen.geom2d import SplineGeometry, unit_square
 from ngsolve import *
 from ngsolve.comp import Region
 
-order = 1
+order = 3
 maxh = 0.15
 
 # diffusion coefficient
@@ -27,7 +27,7 @@ tau = 0.01
 tend = -1
 
 # jump penalty in aswip below
-eta = 1
+eta = 10
 
 geo = SplineGeometry()
 # geo.AddRectangle((0, 0), (2, 1), bcs=[1, 2, 3, 4])
@@ -54,7 +54,6 @@ mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 
 # finite element space
 V = L2(mesh, order=order, flags={'dgjumps': True})
-# V = H1(mesh, order=order, flags={'dgjumps': True})#, 'definedon': [1, 2, 3, 4], 'definedonbound': [1, 2, 3, 4]})
 rho = V.TrialFunction()
 phi = V.TestFunction()
 
@@ -76,18 +75,10 @@ aswip += SymbolicBFI(D*eta / h * (rho - rho.Other()) * (phi - phi.Other()), VOL,
 
 # boundary terms
 aF = BilinearForm(V)
-# aF += SymbolicBFI(alpha1*rho*phi, BND, definedon='alpha1')
-# aF += SymbolicBFI(alpha2*rho*phi, BND, definedon='alpha2')
-# aF += SymbolicBFI(beta1*rho*phi, BND, definedon='beta1')
-# aF += SymbolicBFI(beta2*rho*phi, BND, definedon='beta2')
-# aF += SymbolicBFI(alpha1*rho*phi, BND, definedon=[1])
-# aF += SymbolicBFI(alpha2*rho*phi, BND, definedon=[0])
-# aF += SymbolicBFI(beta1*rho*phi, BND, definedon=[2])
-# aF += SymbolicBFI(beta2*rho*phi, BND, definedon=[3])
-aF += SymbolicBFI(alpha1*rho*phi, definedon=Region(mesh, BND, 'alpha1'))
-aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'))
-aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'))
-aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'))
+aF += SymbolicBFI(alpha1*rho*phi, definedon=Region(mesh, BND, 'alpha1'), skeleton=True)
+aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
+aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'), skeleton=True)
+aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=True)
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -103,12 +94,8 @@ m = BilinearForm(V)
 m += SymbolicBFI(rho*phi)
 
 f = LinearForm(V)
-# f += SymbolicLFI(alpha1 * phi, BND, definedon='alpha1')
-# f += SymbolicLFI(alpha2 * phi, BND, definedon='alpha2')
-# f += SymbolicLFI(alpha1 * phi, BND, definedon=[1])
-# f += SymbolicLFI(alpha2 * phi, BND, definedon=[0])
-f += SymbolicLFI(alpha1 * phi, definedon=Region(mesh, BND, 'alpha1'))
-f += SymbolicLFI(alpha2 * phi, definedon=Region(mesh, BND, 'alpha2'))
+f += SymbolicLFI(alpha1 * phi, definedon=Region(mesh, BND, 'alpha1'), skeleton=True)
+f += SymbolicLFI(alpha2 * phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
 
 print('Assembling aswip...')
 aswip.Assemble()
@@ -132,7 +119,6 @@ with TaskManager():
         print("\nt = {:10.6e}".format(t))
         t += tau
 
-
         print('Assembling aupw...')
         aupw.Assemble()
 
@@ -144,3 +130,4 @@ with TaskManager():
         rho2.vec.data = invmat * rhs
 
         Redraw(blocking=False)
+        # input()
