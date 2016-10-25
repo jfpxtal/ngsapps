@@ -3,7 +3,7 @@
 
 from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
 from netgen.csg import Pnt
-from netgen.geom2d import SplineGeometry, unit_square
+from netgen.geom2d import SplineGeometry
 from ngsolve import *
 from ngsolve.comp import Region
 
@@ -26,7 +26,7 @@ u = CoefficientFunction((1.0, 0.0))
 tau = 0.01
 tend = -1
 
-# jump penalty in aswip below
+# jump penalty in asip below
 eta = 10
 
 geo = SplineGeometry()
@@ -65,13 +65,13 @@ rho2.Set(CoefficientFunction(0.5))
 n = specialcf.normal(mesh.dim)
 h = specialcf.mesh_size
 
-# symmetric weighted interior penalty method
+# symmetric interior penalty method
 # for the diffusion
-aswip = BilinearForm(V)
-aswip += SymbolicBFI(D*grad(rho)*grad(phi))
-aswip += SymbolicBFI(-D*0.5*(grad(rho)+grad(rho).Other()) * n * (phi - phi.Other()), VOL, skeleton=True)
-aswip += SymbolicBFI(-D*0.5*(grad(phi)+grad(phi).Other()) * n * (rho - rho.Other()), VOL, skeleton=True)
-aswip += SymbolicBFI(D*eta / h * (rho - rho.Other()) * (phi - phi.Other()), VOL, skeleton=True)
+asip = BilinearForm(V)
+asip += SymbolicBFI(D*grad(rho)*grad(phi))
+asip += SymbolicBFI(-D*0.5*(grad(rho)+grad(rho.Other())) * n * (phi - phi.Other()), skeleton=True)
+asip += SymbolicBFI(-D*0.5*(grad(phi)+grad(phi.Other())) * n * (rho - rho.Other()), skeleton=True)
+asip += SymbolicBFI(D*eta / h * (rho - rho.Other()) * (phi - phi.Other()), skeleton=True)
 
 # boundary terms
 aF = BilinearForm(V)
@@ -86,8 +86,8 @@ def abs(x):
 # upwind scheme for the advection
 aupw = BilinearForm(V)
 aupw += SymbolicBFI(-rho*(1-rho2)*u*grad(phi))
-aupw += SymbolicBFI((1-rho2)*u*n*0.5*(rho+rho.Other())*(phi-phi.Other()), VOL, skeleton=True)
-aupw += SymbolicBFI(0.5*abs((1-rho)*u*n) * (rho - rho.Other())*(phi - phi.Other()), VOL, skeleton=True)
+aupw += SymbolicBFI((1-rho2)*u*n*0.5*(rho+rho.Other())*(phi-phi.Other()), skeleton=True)
+aupw += SymbolicBFI(0.5*abs((1-rho)*u*n) * (rho - rho.Other())*(phi - phi.Other()), skeleton=True)
 
 # mass matrix
 m = BilinearForm(V)
@@ -97,8 +97,8 @@ f = LinearForm(V)
 f += SymbolicLFI(alpha1 * phi, definedon=Region(mesh, BND, 'alpha1'), skeleton=True)
 f += SymbolicLFI(alpha2 * phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
 
-print('Assembling aswip...')
-aswip.Assemble()
+print('Assembling asip...')
+asip.Assemble()
 print('Assembling aF...')
 aF.Assemble()
 print('Assembling m...')
@@ -107,7 +107,7 @@ print('Assembling f...')
 f.Assemble()
 
 rhs = rho2.vec.CreateVector()
-mstar = aswip.mat.CreateMatrix()
+mstar = asip.mat.CreateMatrix()
 
 Draw(rho2, mesh, 'rho')
 
@@ -125,7 +125,7 @@ with TaskManager():
         rhs.data = m.mat * rho2.vec
         rhs.data += tau * f.vec
 
-        mstar.AsVector().data = m.mat.AsVector() + tau * (aswip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector())
+        mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector())
         invmat = mstar.Inverse(V.FreeDofs())
         rho2.vec.data = invmat * rhs
 
