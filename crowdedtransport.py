@@ -6,6 +6,7 @@ from netgen.csg import Pnt
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
 from ngsolve.comp import Region
+import matplotlib.pyplot as plt
 
 order = 3
 maxh = 0.15
@@ -20,6 +21,7 @@ beta1 = 0.4
 beta2 = 0.2
 
 # velocity field
+V = CoefficientFunction(-x)
 u = CoefficientFunction((1.0, 0.0))
 
 # time step and end
@@ -53,12 +55,12 @@ for i, (pt1, pt2) in enumerate(zip(pts, pts[1:]+[pts[0]])):
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 
 # finite element space
-V = L2(mesh, order=order, flags={'dgjumps': True})
-rho = V.TrialFunction()
-phi = V.TestFunction()
+fes = L2(mesh, order=order, flags={'dgjumps': True})
+rho = fes.TrialFunction()
+phi = fes.TestFunction()
 
 # initial value
-rho2 = GridFunction(V)
+rho2 = GridFunction(fes)
 rho2.Set(CoefficientFunction(0.5))
 
 # special values for DG
@@ -67,14 +69,14 @@ h = specialcf.mesh_size
 
 # symmetric interior penalty method
 # for the diffusion
-asip = BilinearForm(V)
+asip = BilinearForm(fes)
 asip += SymbolicBFI(D*grad(rho)*grad(phi))
 asip += SymbolicBFI(-D*0.5*(grad(rho)+grad(rho.Other())) * n * (phi - phi.Other()), skeleton=True)
 asip += SymbolicBFI(-D*0.5*(grad(phi)+grad(phi.Other())) * n * (rho - rho.Other()), skeleton=True)
 asip += SymbolicBFI(D*eta / h * (rho - rho.Other()) * (phi - phi.Other()), skeleton=True)
 
 # boundary terms
-aF = BilinearForm(V)
+aF = BilinearForm(fes)
 aF += SymbolicBFI(alpha1*rho*phi, definedon=Region(mesh, BND, 'alpha1'), skeleton=True)
 aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
 aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'), skeleton=True)
@@ -84,16 +86,16 @@ def abs(x):
     return IfPos(x, x, -x)
 
 # upwind scheme for the advection
-aupw = BilinearForm(V)
+aupw = BilinearForm(fes)
 aupw += SymbolicBFI(-rho*(1-rho2)*u*grad(phi))
 aupw += SymbolicBFI((1-rho2)*u*n*0.5*(rho+rho.Other())*(phi-phi.Other()), skeleton=True)
 aupw += SymbolicBFI(0.5*abs((1-rho)*u*n) * (rho - rho.Other())*(phi - phi.Other()), skeleton=True)
 
 # mass matrix
-m = BilinearForm(V)
+m = BilinearForm(fes)
 m += SymbolicBFI(rho*phi)
 
-f = LinearForm(V)
+f = LinearForm(fes)
 f += SymbolicLFI(alpha1 * phi, definedon=Region(mesh, BND, 'alpha1'), skeleton=True)
 f += SymbolicLFI(alpha2 * phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
 
@@ -111,6 +113,14 @@ mstar = asip.mat.CreateMatrix()
 
 Draw(rho2, mesh, 'rho')
 
+times = [0.0]
+entropy = rho2*log(rho2) + rho2*V
+# entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
+ents = [Integrate(entropy, mesh)]
+fig, ax = plt.subplots()
+line, = ax.plot(times, ents)
+plt.show(block=False)
+
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
@@ -126,8 +136,15 @@ with TaskManager():
         rhs.data += tau * f.vec
 
         mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector())
-        invmat = mstar.Inverse(V.FreeDofs())
+        invmat = mstar.Inverse(fes.FreeDofs())
         rho2.vec.data = invmat * rhs
 
         Redraw(blocking=False)
+        times.append(t)
+        ents.append(Integrate(entropy, mesh))
+        line.set_xdata(times)
+        line.set_ydata(ents)
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
         # input()
