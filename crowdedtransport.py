@@ -15,7 +15,7 @@ maxh = 0.15
 vtkoutput = False
 
 # diffusion coefficient
-D = 0.1
+D = 0.01
 # inflow rates
 alpha1 = 0.2
 alpha2 = 0.4
@@ -29,7 +29,7 @@ u = CoefficientFunction((1.0, 0.0))
 
 # time step and end
 tau = 0.01
-tend = -1
+tend = 8
 
 # jump penalty in asip below
 eta = 10
@@ -54,8 +54,21 @@ for y in ycoords:
 
 bcs = [None, 'alpha2', None, 'alpha1', None, None, None, 'beta1', None, 'beta2', None, None]
 for i, (pt1, pt2) in enumerate(zip(pts, pts[1:]+[pts[0]])):
-    geo.Append(['line', pt1, pt2], bc=bcs[i])
+    geo.Append(['line', pt1, pt2], bc=bcs[i], leftdomain=1)
+
+def MakePolygon(geo, pts, **args):
+    ptids = [geo.AppendPoint(*p) for p in pts]
+    for p1, p2 in zip(ptids, ptids[1:]+[pts[0]]):
+        geo.Append(['line', p1, p2], **args)
+
+
+geo.AddCircle((1.5, 0.5), 0.2, leftdomain=0, rightdomain=1)
+# MakePolygon(geo, [(1.3, 0.35), (1.6, 0.35), (1.6, 0.65)])
+# geo.Append(['line', (1.3, 0.35), (1.6, 0.35)], leftdomain=0)
+# geo.Append(['line', (1.6, 0.35), (1.6, 0.65)], leftdomain=0)
+# geo.Append(['line', (1.6, 0.65), (1.3, 0.35)], leftdomain=0)
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
+mesh.Curve(order)
 
 # finite element space
 fes = L2(mesh, order=order, flags={'dgjumps': True})
@@ -125,7 +138,7 @@ line, = ax.plot(times, ents)
 plt.show(block=False)
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/crowdtrans_",subdivision=3)
+    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans_circ/crowdtrans_circ_",subdivision=3)
     vtk.Do()
 
 input("Press any key...")

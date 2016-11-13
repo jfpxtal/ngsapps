@@ -1,5 +1,6 @@
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
+import matplotlib.pyplot as plt
 
 order = 3
 maxh = 0.15
@@ -13,6 +14,8 @@ Db = 0.3
 # advection potentials
 gradVr = CoefficientFunction((1.0, 0.0))
 gradVb = -gradVr
+Vr = x
+Vb = -x
 
 # time step and end
 tau = 0.01
@@ -121,6 +124,13 @@ mstar = m.mat.CreateMatrix()
 Draw(r2, mesh, 'r')
 Draw(b2, mesh, 'b')
 
+times = [0.0]
+entropy = r2*log(r2) + b2*log(b2) * (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
+ents = [Integrate(entropy, mesh)]
+fig, ax = plt.subplots()
+line, = ax.plot(times, ents)
+plt.show(block=False)
+
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
@@ -139,4 +149,11 @@ with TaskManager():
         s.vec.data = invmat * rhs
 
         Redraw(blocking=False)
+        times.append(t)
+        ents.append(Integrate(entropy, mesh))
+        line.set_xdata(times)
+        line.set_ydata(ents)
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
         # input()
