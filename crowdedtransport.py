@@ -7,9 +7,12 @@ from netgen.geom2d import SplineGeometry
 from ngsolve import *
 from ngsolve.comp import Region
 import matplotlib.pyplot as plt
+from ngsapps.utils import *
 
 order = 3
 maxh = 0.15
+
+vtkoutput = False
 
 # diffusion coefficient
 D = 0.1
@@ -121,6 +124,10 @@ fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
+if vtkoutput:
+    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/crowdtrans_",subdivision=3)
+    vtk.Do()
+
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
@@ -147,4 +154,6 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
-        # input()
+
+        if vtkoutput:
+            vtk.Do()

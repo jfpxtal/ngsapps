@@ -3,7 +3,7 @@
 namespace ngfem
 {
   RandomCoefficientFunction::RandomCoefficientFunction (double lower, double upper)
-    : lower_bound(lower), upper_bound(upper),
+    : CoefficientFunction(1), lower_bound(lower), upper_bound(upper),
       unif(lower_bound,upper_bound), re(r())
   { ; }
 

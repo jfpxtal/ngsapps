@@ -48,7 +48,7 @@ namespace ngcomp
 
     int ne = ma->GetNE();
 
-    IntRange range = only_element >= 0 ? IntRange(only_element,only_element+1) : Range(ne);
+    IntRange range = only_element >= 0 ? IntRange(only_element,only_element+1) : IntRange(ne);
 
     Array<Vec<D>> points;
     Array<Array<int>> cells;
@@ -299,7 +299,7 @@ namespace ngcomp
 
     int ne = ma->GetNE();
 
-    IntRange range = only_element >= 0 ? IntRange(only_element,only_element+1) : Range(ne);
+    IntRange range = only_element >= 0 ? IntRange(only_element,only_element+1) : IntRange(ne);
 
     for (int elnr : range)
     {

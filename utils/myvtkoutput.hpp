@@ -79,4 +79,12 @@ namespace ngcomp
 
 }
 
+namespace ngstd
+{
+  template <>
+  struct PyWrapperTraits<ngcomp::MyBaseVTKOutput> {
+    typedef PyWrapperClass<ngcomp::MyBaseVTKOutput> type;
+  };
+}
+
 #endif

@@ -9,7 +9,7 @@ LagrangeSegm::LagrangeSegm (int order)
 
 
 void LagrangeSegm::CalcShape (const IntegrationPoint & ip,
-                                    SliceVector<> shape) const
+                                    BareSliceVector<> shape) const
 {
   double x = ip(0);
   T_CalcShape (x, shape);
@@ -39,7 +39,7 @@ T LagrangeSegm::T_LagrangeBasis1D(int i, const T &x) const
 }
 
 template <class T>
-void LagrangeSegm::T_CalcShape (const T &x, SliceVector<T> shape) const
+void LagrangeSegm::T_CalcShape (const T &x, BareSliceVector<T> shape) const
 {
   int ii = 0;
 
@@ -64,7 +64,7 @@ LagrangeTrig :: LagrangeTrig (int order)
 
 
 void LagrangeTrig :: CalcShape (const IntegrationPoint & ip,
-                                    SliceVector<> shape) const
+                                    BareSliceVector<> shape) const
 {
   double x = ip(0);
   double y = ip(1);
@@ -107,7 +107,7 @@ T LagrangeTrig::T_LagrangeBasis2D(int i, int j, const T &x, const T &y) const
 
 template <class T>
 void LagrangeTrig::T_CalcShape (const T & x, const T & y,
-                                    SliceVector<T> shape) const
+                                    BareSliceVector<T> shape) const
 {
   int ii = 0;
 
@@ -155,7 +155,7 @@ LagrangeTet :: LagrangeTet (int order)
 
 
 void LagrangeTet :: CalcShape (const IntegrationPoint & ip,
-                                    SliceVector<> shape) const
+                                    BareSliceVector<> shape) const
 {
   double x = ip(0);
   double y = ip(1);
@@ -203,7 +203,7 @@ T LagrangeTet::T_LagrangeBasis3D(int i, int j, int k, const T &x, const T &y, co
 
 template <class T>
 void LagrangeTet::T_CalcShape (const T & x, const T & y, const T & z,
-                                    SliceVector<T> shape) const
+                                    BareSliceVector<T> shape) const
 {
   int ii = 0;
 
