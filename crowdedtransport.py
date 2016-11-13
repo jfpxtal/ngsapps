@@ -24,7 +24,7 @@ beta1 = 0.4
 beta2 = 0.2
 
 # velocity field
-V = CoefficientFunction(-x)
+V = CoefficientFunction(x)
 u = CoefficientFunction((1.0, 0.0))
 
 # time step and end
@@ -92,7 +92,7 @@ def abs(x):
 aupw = BilinearForm(fes)
 aupw += SymbolicBFI(-rho*(1-rho2)*u*grad(phi))
 aupw += SymbolicBFI((1-rho2)*u*n*0.5*(rho+rho.Other())*(phi-phi.Other()), skeleton=True)
-aupw += SymbolicBFI(0.5*abs((1-rho)*u*n) * (rho - rho.Other())*(phi - phi.Other()), skeleton=True)
+aupw += SymbolicBFI(0.5*abs((1-rho2)*u*n) * (rho - rho.Other())*(phi - phi.Other()), skeleton=True)
 
 # mass matrix
 m = BilinearForm(fes)
@@ -117,8 +117,8 @@ mstar = asip.mat.CreateMatrix()
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
-entropy = rho2*log(rho2) + rho2*V
 # entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
+entropy = rho2*log(rho2) - rho2*V
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
