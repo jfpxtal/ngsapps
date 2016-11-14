@@ -3,6 +3,7 @@
 #include <python_ngstd.hpp>
 #include "myvtkoutput.hpp"
 #include "randomcf.hpp"
+#include "composecf.hpp"
 
 using namespace ngfem;
 
@@ -24,6 +25,16 @@ void ExportNgsAppsUtils(py::module &m)
             },
           py::arg("lower")=0.0, py::arg("upper")=1.0
       );
+
+  typedef PyWrapper<ComposeCoefficientFunction> PyComposeCF;
+  py::class_<PyComposeCF,PyCF>
+    (m, "Compose", "compose two coefficient functions, c2 after c1")
+    .def ("__init__",
+          [] (PyComposeCF *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma)
+          {
+            new (instance) PyComposeCF(make_shared<ComposeCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma));
+          })
+    ;
 
   using namespace ngcomp;
 
