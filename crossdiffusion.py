@@ -1,6 +1,7 @@
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
 import matplotlib.pyplot as plt
+from ngsapps.utils import *
 
 order = 3
 maxh = 0.15
@@ -26,12 +27,15 @@ eta = 100
 
 # geometry and mesh
 geo = SplineGeometry()
-geo.AddRectangle((0, 0), (2, 1))
+geo.SetMaterial(1, 'vis1')
+geo.SetMaterial(2, 'vis2')
+geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
+geo.AddRectangle((0, -1.3), (2, -0.3), leftdomain=2)
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 
 # finite element space
 fes1 = L2(mesh, order=order)
-fes = FESpace([fes1, fes1], flags={'dgjumps': True})
+fes = FESpace([fes1, fes1], flags={'definedon': ['vis1'], 'dgjumps': True})
 
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
@@ -40,8 +44,8 @@ tr, tb = fes.TestFunction()
 s = GridFunction(fes)
 r2 = s.components[0]
 b2 = s.components[1]
-r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0))
-b2.Set(IfPos(x-1.8, 0.6, 0))
+r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=mesh.Materials('vis1'))
+b2.Set(IfPos(x-1.8, 0.6, 0), definedon=mesh.Materials('vis1'))
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -121,8 +125,10 @@ m.Assemble()
 rhs = s.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-Draw(r2, mesh, 'r')
-Draw(b2, mesh, 'b')
+# Draw(r2, mesh, 'r')
+# Draw(b2, mesh, 'b')
+both = r2 + Compose((x, y+1.3), b2, mesh)
+Draw(both, mesh, 'both')
 
 times = [0.0]
 entropy = r2*log(r2) + b2*log(b2) * (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
