@@ -1,0 +1,245 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{a4wide}
+\usepackage{graphicx}
+\usepackage{latexsym}
+\usepackage{epsfig}
+\usepackage{amssymb}
+\usepackage{amstext}
+\usepackage{amsgen}
+\usepackage{amsxtra}
+\usepackage{amsgen}
+\usepackage{amsthm}
+\usepackage{color}
+
+%\usepackage{showkeys}
+
+\usepackage{subfigure}
+
+\def\eps{\varepsilon}
+
+\def\d{\,{\rm d}}
+\def\div{{\rm div}}
+
+\def\RR{\mathbb{R}}
+\def\CC{\mathbb{C}}
+
+\newcommand\diam{\mathop{\rm diam}}
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{lemma}[thm]{Lemma}
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{rem}[thm]{Remark}
+\newtheorem{imprem}[thm]{Important remark}
+
+\theoremstyle{definition}
+\newtheorem{example}[thm]{Example}
+\newtheorem{definition}[thm]{Definition}
+\newtheorem{algorithm}[thm]{Algorithm}
+\newtheorem{conjecture}{Conjecture}
+\newtheorem{assumption}[thm]{Assumption}
+\newtheorem{scheme}{Scheme}
+
+
+
+\numberwithin{equation}{section}
+
+%\renewcommand{\baselinestretch}{2}
+
+\newcounter{hypcounter}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\R}{\mathbb{R}}
+% \newcommand{\RR}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\ol}[1]{\overline{#1}}
+\newcommand{\ul}[1]{\underline{#1}}
+\newcommand{\pf}[2]{\frac{\partial {#1}}{\partial {#2}}}
+%\newcommand{\ps}[2]{\frac{\partial^2 {#1}}{\partial {#2}^2}}
+\newcommand{\df}[2]{\frac{d {#1}}{d {#2}}}
+%\newcommand{\ds}[2]{\frac{d^2 {#1}}{d {#2}^2}}
+\newcommand{\dx}{\Delta x}
+\newcommand{\dt}{\Delta t}
+\newcommand{\eqdef}{:=}
+\newcommand{\dv}{\text{div}}
+\newcommand{\di}{\displaystyle}
+\newcommand{\lk}{\left(}
+\newcommand{\rk}{\right)}
+
+\newcommand{\energy}{{\cal E}}
+\newcommand{\x}{{\bf x}}
+% \newcommand{u}{u}
+\newcommand{\q}{\quad}
+\newcommand{\na}{\nabla}
+
+\newcommand{\weak}{\rightharpoonup}
+\newcommand{\embedded}{\hookrightarrow}
+
+\newcommand{\bigO}{{\cal O}}
+\newcommand{\smallO}{{\cal o}}
+\newcommand{\dom}{{\cal D}}
+\newcommand{\norm}[1]{\Vert #1 \Vert}
+\newcommand{\abs}[1]{\vert #1 \vert}
+\newcommand{\intxt}[1]{\int\limits_0^{t_*} \int\limits_0^1 #1 ~dx dt}
+\newcommand{\intx}[1]{ \int\limits_0^1 #1 ~dx }
+\newcommand{\intt}[1]{\int\limits_0^{t_*} #1 ~dt}
+\newcommand{\set}[2]{\{~#1~|~#2~\}}
+\newcommand{\M}{{\cal M}}
+\newcommand{\A}{{\cal A}}
+\newcommand{\norma}{\|\hspace{-0.4mm}|}
+\newcommand{\jump}[1]{[\![#1]\!]}
+\newcommand{\avg}[1]{\{\!\{#1\}\!\}}
+
+\newcommand{\ur}{\underline{r}}
+\newcommand{\ub}{\underline{b}}
+\newcommand{\rr}[1]{\textcolor{red}{#1}}
+\newcommand{\rb}[1]{\textcolor{blue}{#1}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+% \DeclareMathOperator*{\liminf}{lim\,inf}
+
+%opening
+\title{Questions regarding the FEM analysis of cross-diffusion / nonlocal equations with degenerate diffusion}
+\author{Jan-F. Pietschmann}
+
+\begin{document}
+\maketitle
+\subsubsection*{Introduction}
+For $x\in\Omega\subset \RR^N$ open and bounded. and $t>0$, we are interested in following \textbf{two problems}:
+\begin{align}\label{eq:porousfem}
+\mathrm{(P1)}\quad\partial_t \rho = \nabla\cdot (\rho [ \eps\nabla \rho^{m-1} + \nabla K \ast \rho]),
+\end{align}
+$m\in (1,\infty)$, supplemented with the initial conditions
+\begin{equation}
+	\rho(\cdot,0) = \rho_0\text{ in } \Omega.
+\end{equation}
+And the system of cross-diffusion equations for the densities $r=r(t,x)$ and $b=b(t,x)$ given by
+\begin{equation*}
+    \mathrm{(P2)}\quad\begin{aligned}
+ \partial_t r &= \nabla \cdot (D_1[(1-\rho)\nabla r + r \nabla \rho ] + r(1-\rho)\nabla V),\\
+\partial_t b &= \nabla \cdot (D_2[ (1-\rho)\nabla b + b \nabla \rho ] + b(1-\rho)\nabla W),   \end{aligned}    
+\end{equation*}
+where $r,\,b$  $\rho = r+b$ and supplemented with the initial conditions
+\begin{equation}
+	r(\cdot,0) = r_0, \quad b(\cdot,0) = b_0 \text{ in } \Omega.
+\end{equation}
+Note that alternatively, we can write the system in the (less symmetric) form
+ \begin{equation}
+    \begin{aligned}
+ \partial_t r &= \nabla \cdot (D_1(1-b)\nabla r + r \nabla b + r(1-\rho)\nabla V]),\\
+ \partial_t b &= \nabla \cdot (D_2[ (1-r)\nabla b + b \nabla r + b(1-\rho)\nabla W]).
+\end{aligned}    
+\end{equation}
+\subsubsection*{Connection between the two problems}
+First of all, note that in the case $D_1=D_2=1$ and $V=W$, we can add the two equations in (P1) and obtain
+\begin{align}\label{eq:sum}
+ \partial_t \rho = \nabla\cdot (\nabla \rho + \rho(1-\rho)\nabla V).
+\end{align}
+Chosing $V = K \ast \rho$, we end up with problem (P1).
+\subsubsection*{DG Methods}
+Both problems are degenerate parabolic and may thus easily become convection domminated. Furthermore, in some applications, we are interested in the case of small diffusion, e.g. $D_1 = D_2 = \eps << 1$. This motivates / might motivate the use of discontinuous Galerkin methods.
+\subsection*{Boundary conditions and Kernels $K$}
+Depending on the application, the equations above can be supplemented with different types of boundary conditions: 
+\begin{itemize}
+ \item\textbf{No flux} We ask for the total flux in normal direction to vanish at the boundary - this, in particular, implies the conservation of mass:
+ \begin{align*}
+  \nabla \cdot (D_1(1-\rho)\nabla r + r \nabla \rho + r(1-\rho)\nabla V)\cdot n &= 0\text{ on } \partial\Omega,\\
+  \nabla \cdot (D_2(1-\rho)\nabla b + b \nabla \rho + r(1-\rho)\nabla V)\cdot n &= 0\text{ on } \partial\Omega.
+ \end{align*}
+ \item\textbf{Flux conditions} Here we prescribe the flux at the boundary, in a non-linear fashon depending on the densities themselves. To this end, we also divide the boundary into a influx part $\Gamma\subset \partial\Omega$ and a outflux part and $\Sigma \subset\partial\Omega$ and abbreviate the respective fluxes:
+ \begin{align*}
+  j_r &:= D_1(1-\rho)\nabla r + r \nabla \rho + r(1-\rho)\nabla V,\\
+  j_b &:= D_2(1-\rho)\nabla b + b \nabla \rho + r(1-\rho)\nabla V.
+ \end{align*}
+ Then, the b.c.s ware given as 
+ \begin{align}
+  j_r\cdot n &= \alpha_1 (1-\rho), &j_b\cdot n = \alpha_2 (1-\rho)\;\text{ on }\Gamma,\\
+  j_r\cdot n &= \beta_1r, &j_b\cdot n = \beta_2 b\;\text{ on }\Gamma.
+ \end{align}
+ For the equation \eqref{eq:porousfem}, the situation simplifies to
+ \begin{align}
+  j\cdot n = \alpha (1-\rho)\;\text{ on }\Gamma,\\
+  j\cdot n = \beta \rho\;\text{ on }\Gamma.
+ \end{align}
+\item\textbf{Other boundary conditions} In some applications (e.g. ion channels, nanopores) it makes also sense to consider mixed b.c.s consisten of Dirichlet on one part of the domain and no-flux on the other.
+ \end{itemize}
+Regarding the Kernels $K$, we have
+\begin{itemize}
+\item\textbf{Singular Kernels} One classic example would be the Newtonian Potential, i.e. $K$ such that $K\ast f$ means solving the Problem
+\begin{align*}
+ -\Delta u = f,
+\end{align*}
+with appropriate boundary conditions.
+\item\textbf{Smooth Kernels} Kernels which still have full support but are smooth, radially symmetric and decreasing, e.g.
+\begin{align*}
+ K(x) = k(|x|),\; k(r) = \frac{1}{2}e^{-r^2}.
+\end{align*}
+\item\textbf{Kernels with compact support} These are Kernels, not necessarily smooth, e.g. of the form
+\begin{align*}
+ K(x) = \max\, \{ 1-x, 0\}
+\end{align*}
+\end{itemize}
+
+\subsection*{Entropy structure}
+We introduce the \emph{entropy functionals}
+\begin{align}\label{eq:Eporous}
+ F (\rho)=\int_{\Omega} \rho^m + \rho (K\ast \rho)\;dx,
+\end{align}
+for equation (P1) and 
+\begin{align}\label{eq:E}
+ E (r,\,b)=\int_{\Omega} r\log r + b\log b + (1-\rho)\log (1-\rho) + (r+b)V\;dx,
+\end{align}
+for equation (P2) respectively. These functionals are very important for the analyis and are in fact Lyaponov-functionals for the evolution - i.e. they are decreasing in time. 
+% 
+% Introducing the nonlinear diagonal mobility tensor ${\bf M}(r,b)$ given by
+% \begin{equation*}
+% {\bf M}(r,b) = \left(\begin{matrix}
+% r(1-\rho) & 0 \\ 0 & Db (1-\rho)
+% \end{matrix}\right)
+% \end{equation*}
+% we can rewrite \eqref{eq:baerbel} as the following formal gradient flow with respect to $E$
+% \begin{equation}
+% 	\partial_t \left( \begin{array}{l} r \\ b \end{array} \right) = \nabla \cdot
+% \left({\bf M}(r,b) {\bf :} \nabla \left( \begin{array}{l} \partial_r E(r,b) \\ \partial_b E(r,b) \end{array} \right)\right). \label{eq:gradflow0}
+% \end{equation}
+% Inserting the definition \eqref{eq:E} of $E$, we recover \eqref{eq:baerbel}. 
+For example, taking the time derivative of $E$ with respect to time, we see that
+\begin{align}\label{eq:entdiss}
+ \frac{d}{dt}E(r,b) = - \int_\Omega r(1-\rho)|\nabla u|^2 + b(1-\rho)|\nabla v|^2\;dx =: DE(r,b) \le 0,
+\end{align}
+where $u$ and $v$ are the so-called \emph{entropy variables} given by 
+\begin{align}
+  u := \partial_r E  &= \log r - \log(1-\rho) + V, \label{eq:etar} \\
+  v := \partial_b E  &= \log b - \log(1-\rho) + W. \label{eq:etab}.
+\end{align}
+Integrating equation \eqref{eq:entdiss} w.r.t time, we obtain
+\begin{align*}
+ E(r,b) + \int_0^T DE(r,b)\;dt = E(r_0,b_0).
+\end{align*}
+% This is the crucial a priori estimate used in the existence analysis - \rr{Can be use this for the numerical analysis}
+\textbf{This is an important feature that should be reflected by the numerical discretization}.
+
+\subsection*{Work packages}
+\begin{itemize}
+ \item\textbf{(Local) DG Scheme for (P1)} Implement a (local) DG Scheme for (P1), e.g. extending the one of \cite{}. The scheme should for for all $m \in [1,\infty)$ (for $m>2$, the solution is only Lipschitz cont' at the boundary of its support). Interesting experiments would be the convergence to steady states, in particular rates of convergence.\\
+ \rr{Christoph: Ich denke,  man sollte relativ easy das Paper \cite{Zhang2009} auf diesen Fall erweitern koennen. Wenn man zusaetzlich noch zeigen kann, dass das Schema die Entropiedissipation erhaelt + numerische Beispiele koennte rel. schnell ein nettes Paper werden. Die Entropie-geschichte wird wurde schon fuer Finite-Volume-Schemes gezeigt (\cite{Bessemoulin2012,Carrillo_Chertock_Huang_2015}, kannst du einschaetzen, und und wie einfach man das auf (hoehere Ordnung) DG uebertragen kann? Alternativ waere es auch eine Idee, die sachen von \cite{Carrillo_Chertock_Huang_2015} auf den Systemfall (i.e. (P2)) zu erweitern.}
+ 
+ \item\textbf{(Local) DG Scheme for (P2)} Same as above, also with all the different boundary conditions. \rr{In fact, I already implemented a SIP-Scheme in Fenics where I treated the diffusion terms in a semi-explicit way, i.e.
+ $$
+ \nabla\cdot ((1-\rho^n)\nabla r^{n+1} + r^n\nabla \rho^{n+1}).
+ $$
+ This actually worked quite well. Can we analyze this, also already in the above case related to (P1) ?}
+ 
+ \item\textbf{Combinations} Use the schemes from above to solve (P2) but with potential given as in (P1), i.e. $V=c_{11} K\ast r + c_{12}K\ast b$, $W=c_{22} K\ast b + c_{21}K\ast r$, \rr{see our recent preprint \cite{Berendsen2016} for details}.
+ 
+\end{itemize}
+
+% \subsection*{Optimal control problem}
+% \rr{Wirklich ?}
+
+\bibliographystyle{plain}
+\bibliography{crossdg}
+
+
+\end{document}
