@@ -64,7 +64,7 @@ namespace ngcomp
       auto et = el.GetType();
       if (et == ET_TRIG || et == ET_TET)
       {
-        ElementTransformation & eltrans = ma->GetTrafo(elnr, 0, lh);
+        ElementTransformation & eltrans = ma->GetTrafo(elnr, VOL, lh);
 
         int offset = points.Size();
         for (auto ip : ref_vertices)
@@ -110,9 +110,11 @@ namespace ngcomp
     ss << "POINTS " << points.Size() << " float" << endl;
     for (const Vec<D> & p : points)
     {
-      for (int i = 0; i < D; ++i)
+      int i = 0;
+      for (; i < D; ++i)
         ss << p[i] << " ";
-      if (D==2)
+
+      for (; i < 3; ++i)
         ss << "\t 0.0";
       ss << endl;
     }
@@ -308,7 +310,7 @@ namespace ngcomp
 
       HeapReset hr(lh);
 
-      ElementTransformation & eltrans = ma->GetTrafo(elnr, 0, lh);
+      ElementTransformation & eltrans = ma->GetTrafo(elnr, VOL, lh);
       auto el = ma->GetElement(elnr);
       ELEMENT_TYPE et = el.GetType();
       if (et == ET_TRIG || et == ET_TET)
@@ -379,6 +381,7 @@ namespace ngcomp
 
   static RegisterNumProc<NumProcMyVTKOutput> npmyvtkout("myvtkoutput");
 
+  template class MyVTKOutput<1>;
   template class MyVTKOutput<2>;
   template class MyVTKOutput<3>;
 }

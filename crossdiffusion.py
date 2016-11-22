@@ -131,7 +131,7 @@ both = r2 + Compose((x, y+1.3), b2, mesh)
 Draw(both, mesh, 'both')
 
 times = [0.0]
-entropy = r2*log(r2) + b2*log(b2) * (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
+entropy = r2*log(r2) + b2*log(b2) + (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)

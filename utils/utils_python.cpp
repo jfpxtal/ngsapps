@@ -49,7 +49,9 @@ void ExportNgsAppsUtils(py::module &m)
                              Array<string > names
                                = makeCArray<string> (names_list);
                              shared_ptr<MyBaseVTKOutput> ret;
-                             if (ma->GetDimension() == 2)
+                             if (ma->GetDimension() == 1)
+                               ret = make_shared<MyVTKOutput<1>> (ma, coefs, names, filename, subdivision, only_element, nocache);
+                             else if (ma->GetDimension() == 2)
                                ret = make_shared<MyVTKOutput<2>> (ma, coefs, names, filename, subdivision, only_element, nocache);
                              else
                                ret = make_shared<MyVTKOutput<3>> (ma, coefs, names, filename, subdivision, only_element, nocache);

@@ -101,7 +101,7 @@ class DrawIC:
             self.redraw_e = False
             self.im_e.set_data(self.data_e)
             artists.append(self.im_e)
-        elif self.redraw_c:
+        if self.redraw_c:
             self.redraw_c = False
             self.im_c.set_data(self.data_c)
             artists.append(self.im_c)
