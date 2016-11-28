@@ -35,8 +35,9 @@ namespace ngfem
     int el = ma->FindElementOfPoint(res1, outip, false);
     if (el == -1) return 0;
     LocalHeap lh(100000);
-    BaseMappedIntegrationPoint mappedip(outip, ma->GetTrafo(el, lh));
-    return c2->Evaluate(mappedip);
+    ElementTransformation & eltrans = ma->GetTrafo(el, lh);
+    BaseMappedIntegrationPoint & mip = eltrans(outip, lh);
+    return c2->Evaluate(mip);
   }
 
   double ComposeCoefficientFunction::EvaluateConst () const
@@ -45,7 +46,7 @@ namespace ngfem
   }
 
   void ComposeCoefficientFunction::Evaluate(const BaseMappedIntegrationPoint & ip,
-                        FlatVector<> result) const
+                                            FlatVector<> result) const
   {
     IntegrationPoint outip;
     Vector<> res1(c1->Dimension());
@@ -57,7 +58,8 @@ namespace ngfem
       return;
     }
     LocalHeap lh(100000);
-    BaseMappedIntegrationPoint mappedip(outip, ma->GetTrafo(el, lh));
-    c2->Evaluate(mappedip, result);
+    ElementTransformation & eltrans = ma->GetTrafo(el, lh);
+    BaseMappedIntegrationPoint & mip = eltrans(outip, lh);
+    c2->Evaluate(mip, result);
   }
 }

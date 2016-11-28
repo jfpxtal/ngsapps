@@ -37,7 +37,7 @@ tau = 0.01
 tend = -1
 
 # jump penalty in asip below
-eta = 10
+eta = 100
 
 geo = SplineGeometry()
 # geo.AddRectangle((0, 0), (2, 1), bcs=[1, 2, 3, 4])

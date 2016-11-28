@@ -53,6 +53,8 @@ namespace ngfem
           mirpts *= -1;
           for (int i = 0; i < mirpts.Height(); i++)
             mirpts.Row(i) += point;
+          // at this point, mir probably has the wrong ElementTransformation
+          // but it doesn't matter as long as c2 only uses the global points
           c2->Evaluate (mir, vals2);
           for (int i = 0; i < vals1.Height(); i++)
             hsum += mir[i].GetWeight() * vals1.Row(i) * vals2.Row(i);
