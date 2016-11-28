@@ -9,9 +9,9 @@ from ngsolve.comp import Region
 import matplotlib.pyplot as plt
 from ngsapps.utils import *
 
-order = 3
-# maxh = 0.15
-maxh = 5
+# order = 3
+order = 1
+maxh = 0.15
 
 vtkoutput = False
 
@@ -64,7 +64,6 @@ for i, (pt1, pt2) in enumerate(zip(pts, pts[1:]+[pts[0]])):
 def MakePolygon(geo, pts, **args):
     ptids = [geo.AppendPoint(*p) for p in pts]
     for p1, p2 in zip(ptids, ptids[1:]+[ptids[0]]):
-        print(p1, p2)
         geo.Append(['line', p1, p2], **args)
 
 # geo.AddCircle((1.5, 0.5), 0.2, leftdomain=0, rightdomain=1)
@@ -79,8 +78,8 @@ phi = fes.TestFunction()
 
 # initial value
 rho2 = GridFunction(fes)
-# rho2.Set(CoefficientFunction(0.5))
-rho2.Set(CoefficientFunction(0.0))
+rho2.Set(CoefficientFunction(0.5))
+# rho2.Set(CoefficientFunction(0.0))
 convvec = CoefficientFunction((Convolve(Kdx, rho2, mesh), Convolve(Kdy, rho2, mesh)))
 
 # special values for DG
@@ -127,8 +126,6 @@ print('Assembling asip...')
 asip.Assemble()
 print('Assembling aF...')
 aF.Assemble()
-print('Assembling aconv...')
-aconv.Assemble()
 print('Assembling m...')
 m.Assemble()
 print('Assembling f...')
@@ -153,31 +150,31 @@ if vtkoutput:
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
-with TaskManager():
-    while tend < 0 or t < tend - tau / 2:
-        print("\nt = {:10.6e}".format(t))
-        t += tau
+# with TaskManager():
+while tend < 0 or t < tend - tau / 2:
+    print("\nt = {:10.6e}".format(t))
+    t += tau
 
-        print('Assembling aupw...')
-        aupw.Assemble()
-        print('Assembling aconv...')
-        aconv.Assemble()
+    print('Assembling aupw...')
+    aupw.Assemble()
+    print('Assembling aconv...')
+    aconv.Assemble()
 
-        rhs.data = m.mat * rho2.vec
-        rhs.data += tau * f.vec
+    rhs.data = m.mat * rho2.vec
+    rhs.data += tau * f.vec
 
-        mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
-        invmat = mstar.Inverse(fes.FreeDofs())
-        rho2.vec.data = invmat * rhs
+    mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
+    invmat = mstar.Inverse(fes.FreeDofs())
+    rho2.vec.data = invmat * rhs
 
-        Redraw(blocking=False)
-        times.append(t)
-        ents.append(Integrate(entropy, mesh))
-        line.set_xdata(times)
-        line.set_ydata(ents)
-        ax.relim()
-        ax.autoscale_view()
-        fig.canvas.draw()
+    Redraw(blocking=False)
+    times.append(t)
+    ents.append(Integrate(entropy, mesh))
+    line.set_xdata(times)
+    line.set_ydata(ents)
+    ax.relim()
+    ax.autoscale_view()
+    fig.canvas.draw()
 
-        if vtkoutput:
-            vtk.Do()
+    if vtkoutput:
+        vtk.Do()
