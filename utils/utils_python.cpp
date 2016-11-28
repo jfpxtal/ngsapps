@@ -4,6 +4,7 @@
 #include "myvtkoutput.hpp"
 #include "randomcf.hpp"
 #include "composecf.hpp"
+#include "convolutioncf.hpp"
 
 using namespace ngfem;
 
@@ -35,6 +36,17 @@ void ExportNgsAppsUtils(py::module &m)
             new (instance) PyComposeCF(make_shared<ComposeCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma));
           })
     ;
+
+  typedef PyWrapper<ConvolutionCoefficientFunction> PyConvolveCF;
+  py::class_<PyConvolveCF,PyCF>
+    (m, "Convolve", "convolution of two coefficient functions")
+    .def ("__init__",
+          [] (PyConvolveCF *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma, int order)
+          {
+            new (instance) PyConvolveCF(make_shared<ConvolutionCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma, order));
+          },
+          py::arg("cf1"), py::arg("cf2"), py::arg("mesh"), py::arg("order")=5
+    );
 
   using namespace ngcomp;
 

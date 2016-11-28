@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 from ngsapps.utils import *
 
 order = 3
-maxh = 0.15
+# maxh = 0.15
+maxh = 5
 
 vtkoutput = False
 
@@ -27,9 +28,13 @@ beta2 = 0.2
 V = CoefficientFunction(x)
 u = CoefficientFunction((1.0, 0.0))
 
+# partial derivatives of convolution kernel
+Kdx = -x*exp(-pow(x, 2)-pow(y, 2))
+Kdy = -y*exp(-pow(x, 2)-pow(y, 2))
+
 # time step and end
 tau = 0.01
-tend = 8
+tend = -1
 
 # jump penalty in asip below
 eta = 10
@@ -58,15 +63,12 @@ for i, (pt1, pt2) in enumerate(zip(pts, pts[1:]+[pts[0]])):
 
 def MakePolygon(geo, pts, **args):
     ptids = [geo.AppendPoint(*p) for p in pts]
-    for p1, p2 in zip(ptids, ptids[1:]+[pts[0]]):
+    for p1, p2 in zip(ptids, ptids[1:]+[ptids[0]]):
+        print(p1, p2)
         geo.Append(['line', p1, p2], **args)
 
-
-geo.AddCircle((1.5, 0.5), 0.2, leftdomain=0, rightdomain=1)
-# MakePolygon(geo, [(1.3, 0.35), (1.6, 0.35), (1.6, 0.65)])
-# geo.Append(['line', (1.3, 0.35), (1.6, 0.35)], leftdomain=0)
-# geo.Append(['line', (1.6, 0.35), (1.6, 0.65)], leftdomain=0)
-# geo.Append(['line', (1.6, 0.65), (1.3, 0.35)], leftdomain=0)
+# geo.AddCircle((1.5, 0.5), 0.2, leftdomain=0, rightdomain=1)
+# MakePolygon(geo, [(1.3, 0.35), (1.6, 0.35), (1.6, 0.65)], leftdomain=0, rightdomain=1)
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 mesh.Curve(order)
 
@@ -77,7 +79,9 @@ phi = fes.TestFunction()
 
 # initial value
 rho2 = GridFunction(fes)
-rho2.Set(CoefficientFunction(0.5))
+# rho2.Set(CoefficientFunction(0.5))
+rho2.Set(CoefficientFunction(0.0))
+convvec = CoefficientFunction((Convolve(Kdx, rho2, mesh), Convolve(Kdy, rho2, mesh)))
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -97,6 +101,10 @@ aF += SymbolicBFI(alpha1*rho*phi, definedon=Region(mesh, BND, 'alpha1'), skeleto
 aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'), skeleton=True)
 aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'), skeleton=True)
 aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=True)
+
+# convolution term
+aconv = BilinearForm(fes)
+aconv += SymbolicBFI(rho*convvec*grad(phi))
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -119,6 +127,8 @@ print('Assembling asip...')
 asip.Assemble()
 print('Assembling aF...')
 aF.Assemble()
+print('Assembling aconv...')
+aconv.Assemble()
 print('Assembling m...')
 m.Assemble()
 print('Assembling f...')
@@ -130,15 +140,14 @@ mstar = asip.mat.CreateMatrix()
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
-# entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
-entropy = rho2*log(rho2) - rho2*V
+entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans_circ/crowdtrans_circ_",subdivision=3)
+    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/crowdtrans",subdivision=3)
     vtk.Do()
 
 input("Press any key...")
@@ -151,11 +160,13 @@ with TaskManager():
 
         print('Assembling aupw...')
         aupw.Assemble()
+        print('Assembling aconv...')
+        aconv.Assemble()
 
         rhs.data = m.mat * rho2.vec
         rhs.data += tau * f.vec
 
-        mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector())
+        mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
         invmat = mstar.Inverse(fes.FreeDofs())
         rho2.vec.data = invmat * rhs
 

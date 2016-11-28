@@ -44,8 +44,10 @@ tr, tb = fes.TestFunction()
 s = GridFunction(fes)
 r2 = s.components[0]
 b2 = s.components[1]
-r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=mesh.Materials('vis1'))
-b2.Set(IfPos(x-1.8, 0.6, 0), definedon=mesh.Materials('vis1'))
+# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=mesh.Materials('vis1'))
+# b2.Set(IfPos(x-1.8, 0.6, 0), definedon=mesh.Materials('vis1'))
+r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=mesh.Materials('vis1'))
+b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=mesh.Materials('vis1'))
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -132,7 +134,7 @@ Draw(both, mesh, 'both')
 
 times = [0.0]
 entropy = r2*log(r2) + b2*log(b2) + (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
-ents = [Integrate(entropy, mesh)]
+ents = [Integrate(entropy, mesh, definedon=mesh.Materials('vis1'))]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
@@ -156,7 +158,7 @@ with TaskManager():
 
         Redraw(blocking=False)
         times.append(t)
-        ents.append(Integrate(entropy, mesh))
+        ents.append(Integrate(entropy, mesh, definedon=mesh.Materials('vis1')))
         line.set_xdata(times)
         line.set_ydata(ents)
         ax.relim()
