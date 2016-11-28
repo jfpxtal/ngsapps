@@ -80,7 +80,7 @@ phi = fes.TestFunction()
 rho2 = GridFunction(fes)
 rho2.Set(CoefficientFunction(0.5))
 # rho2.Set(CoefficientFunction(0.0))
-convvec = CoefficientFunction((Convolve(Kdx, rho2, mesh), Convolve(Kdy, rho2, mesh)))
+convvec = CoefficientFunction((Convolve(rho2, Kdx, mesh), Convolve(rho2, Kdy, mesh)))
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -103,7 +103,7 @@ aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=
 
 # convolution term
 aconv = BilinearForm(fes)
-aconv += SymbolicBFI(rho*convvec*grad(phi))
+aconv += SymbolicBFI(-rho*convvec*grad(phi))
 
 def abs(x):
     return IfPos(x, x, -x)
