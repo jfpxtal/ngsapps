@@ -1,5 +1,4 @@
 #include "convolutioncf.hpp"
-#include <iostream>
 
 namespace ngfem
 {
@@ -35,32 +34,35 @@ namespace ngfem
     auto point = ip.GetPoint();
     Vector<> sum(dim);
     sum = 0.0;
-    auto glh = LocalHeap(1000000, "convolutioncf lh", true);
+    auto lh = LocalHeap(100000, "convolutioncf lh", true);
+    // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task
+    // because TaskManager gets stuck on nested tasks
+    for (auto i : Range(ma->GetNE()))
+    {
+      HeapReset hr(lh);
+      ElementId ei(VOL, i);
+      ngcomp::Ngs_Element el(ma->GetElement(ei), ei);
+      auto & trafo = ma->GetTrafo (el, lh);
+      Vector<> hsum(dim);
+      hsum = 0.0;
 
-    ma->IterateElements
-      (VOL, glh, [&] (ngcomp::Ngs_Element el, LocalHeap & lh)
-        {
-          auto & trafo = ma->GetTrafo (el, lh);
-          Vector<> hsum(dim);
-          hsum = 0.0;
-
-          IntegrationRule ir(trafo.GetElementType(), order);
-          BaseMappedIntegrationRule & mir = trafo(ir, lh);
-          FlatMatrix<> vals1(ir.Size(), dim, lh);
-          FlatMatrix<> vals2(ir.Size(), dim, lh);
-          c1->Evaluate (mir, vals1);
-          auto mirpts = mir.GetPoints();
-          mirpts *= -1;
-          for (int i = 0; i < mirpts.Height(); i++)
-            mirpts.Row(i) += point;
-          // at this point, mir probably has the wrong ElementTransformation
-          // but it doesn't matter as long as c2 only uses the global points
-          c2->Evaluate (mir, vals2);
-          for (int i = 0; i < vals1.Height(); i++)
-            hsum += mir[i].GetWeight() * vals1.Row(i) * vals2.Row(i);
-          for(size_t i = 0; i<dim;i++)
-          AsAtomic(sum(i)) += hsum(i);
-        });
+      IntegrationRule ir(trafo.GetElementType(), order);
+      BaseMappedIntegrationRule & mir = trafo(ir, lh);
+      FlatMatrix<> vals1(ir.Size(), dim, lh);
+      FlatMatrix<> vals2(ir.Size(), dim, lh);
+      c1->Evaluate (mir, vals1);
+      auto mirpts = mir.GetPoints();
+      mirpts *= -1;
+      for (int i = 0; i < mirpts.Height(); i++)
+        mirpts.Row(i) += point;
+      // at this point, mir probably has the wrong ElementTransformation
+      // but it doesn't matter as long as c2 only uses the global points
+      c2->Evaluate (mir, vals2);
+      for (int i = 0; i < vals1.Height(); i++)
+        hsum += mir[i].GetWeight() * vals1.Row(i) * vals2.Row(i);
+      for(size_t i = 0; i<dim;i++)
+        sum(i) += hsum(i);
+    }
 
     return sum(0);
   }

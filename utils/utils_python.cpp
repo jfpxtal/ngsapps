@@ -5,18 +5,21 @@
 #include "randomcf.hpp"
 #include "composecf.hpp"
 #include "convolutioncf.hpp"
+#include "cachecf.hpp"
 
 using namespace ngfem;
+
+typedef PyWrapper<CoefficientFunction> PyCF;
+typedef PyWrapper<ngcomp::FESpace> PyFES;
+typedef PyWrapper<BilinearFormIntegrator> PyBFI;
+PyCF MakeCoefficient (py::object val);
 
 void ExportNgsAppsUtils(py::module &m)
 {
   cout << "exporting ngsapps.utils"  << endl;
 
   // Export RandomCoefficientFunction to python (name "RandomCF")
-
-  typedef PyWrapper<CoefficientFunction> PyCF;
   typedef PyWrapperDerived<RandomCoefficientFunction,CoefficientFunction> PyRCF;
-
   py::class_<PyRCF, PyCF>
     (m, "RandomCF")
     .def("__init__",
@@ -27,7 +30,7 @@ void ExportNgsAppsUtils(py::module &m)
           py::arg("lower")=0.0, py::arg("upper")=1.0
       );
 
-  typedef PyWrapper<ComposeCoefficientFunction> PyComposeCF;
+  typedef PyWrapperDerived<ComposeCoefficientFunction, CoefficientFunction> PyComposeCF;
   py::class_<PyComposeCF,PyCF>
     (m, "Compose", "compose two coefficient functions, c2 after c1")
     .def ("__init__",
@@ -37,7 +40,7 @@ void ExportNgsAppsUtils(py::module &m)
           })
     ;
 
-  typedef PyWrapper<ConvolutionCoefficientFunction> PyConvolveCF;
+  typedef PyWrapperDerived<ConvolutionCoefficientFunction, CoefficientFunction> PyConvolveCF;
   py::class_<PyConvolveCF,PyCF>
     (m, "Convolve", "convolution of two coefficient functions")
     .def ("__init__",
@@ -46,7 +49,44 @@ void ExportNgsAppsUtils(py::module &m)
             new (instance) PyConvolveCF(make_shared<ConvolutionCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma, order));
           },
           py::arg("cf1"), py::arg("cf2"), py::arg("mesh"), py::arg("order")=5
-    );
+      );
+
+  typedef PyWrapperDerived<SymbolicBilinearFormIntegrator, BilinearFormIntegrator> PySymBFI;
+  py::class_<PySymBFI, PyBFI>
+    (m, "SymbolicBFI_NoDG", "symbolic bfi without dg terms, needed for cachecf")
+    .def ("__init__",
+          [](PySymBFI *instance, PyCF cf, VorB vb, bool element_boundary, py::object definedon)
+           {
+             py::extract<ngcomp::Region> defon_region(definedon);
+             if (defon_region.check())
+               vb = VorB(defon_region());
+
+             new (instance) PySymBFI(make_shared<SymbolicBilinearFormIntegrator> (cf.Get(), vb, element_boundary));
+           },
+          py::arg("form"), py::arg("VOL_or_BND")=VOL,
+          py::arg("element_boundary")=false,
+          py::arg("definedon")=DummyArgument()
+     );
+
+  typedef PyWrapperDerived<CacheCoefficientFunction, CoefficientFunction> PyCacheCF;
+  py::class_<PyCacheCF,PyCF>
+    (m, "Cache", "cache results of a coefficient function in all integration points needed by a symbolic  integrator")
+    .def ("__init__",
+          [] (PyCacheCF *instance, py::object c, PyFES fes)
+          {
+            new (instance) PyCacheCF(make_shared<CacheCoefficientFunction>(MakeCoefficient(c).Get(), fes.Get()));
+          },
+          py::arg("cf"), py::arg("fespace")
+      )
+    .def("SetBFI", FunctionPointer([](PyCacheCF & self, PySymBFI bfi)
+      {
+        self->SetBFI(bfi.Get());
+      }))
+    .def("Refresh", FunctionPointer([](PyCacheCF & self)
+      {
+        self->Refresh();
+      }))
+    ;
 
   using namespace ngcomp;
 

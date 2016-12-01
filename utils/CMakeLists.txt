@@ -4,6 +4,7 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   myvtkoutput.hpp myvtkoutput.cpp
   composecf.hpp composecf.cpp
   convolutioncf.hpp convolutioncf.cpp
+  cachecf.hpp cachecf.cpp
   )
 
 set_target_properties(ngsapps_utils PROPERTIES SUFFIX ".so")

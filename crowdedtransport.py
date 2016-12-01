@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 from ngsapps.utils import *
 
 # order = 3
-order = 1
+order = 2
+conv_order = 3
 maxh = 0.15
 
 vtkoutput = False
@@ -80,7 +81,13 @@ phi = fes.TestFunction()
 rho2 = GridFunction(fes)
 rho2.Set(CoefficientFunction(0.5))
 # rho2.Set(CoefficientFunction(0.0))
-convvec = CoefficientFunction((Convolve(rho2, Kdx, mesh), Convolve(rho2, Kdy, mesh)))
+
+# set up coefficient functions for convolution terms
+# and caches to prevent unnecessary calculation in aconv.Assemble()
+convx = Convolve(rho2, Kdx, mesh, conv_order)
+convx_cache = Cache(convx, fes)
+convy = Convolve(rho2, Kdy, mesh, conv_order)
+convy_cache = Cache(convy, fes)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -103,7 +110,11 @@ aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=
 
 # convolution term
 aconv = BilinearForm(fes)
-aconv += SymbolicBFI(-rho*convvec*grad(phi))
+convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx_cache, convy_cache))*grad(phi))
+# convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx, convy))*grad(phi))
+aconv += convbfi
+convx_cache.SetBFI(convbfi)
+convy_cache.SetBFI(convbfi)
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -150,31 +161,34 @@ if vtkoutput:
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
-# with TaskManager():
-while tend < 0 or t < tend - tau / 2:
-    print("\nt = {:10.6e}".format(t))
-    t += tau
+with TaskManager():
+    while tend < 0 or t < tend - tau / 2:
+        print("\nt = {:10.6e}".format(t))
+        t += tau
 
-    print('Assembling aupw...')
-    aupw.Assemble()
-    print('Assembling aconv...')
-    aconv.Assemble()
+        print('Assembling aupw...')
+        aupw.Assemble()
+        print('Calculating convolution integrals...')
+        convx_cache.Refresh()
+        convy_cache.Refresh()
+        print('Assembling aconv...')
+        aconv.Assemble()
 
-    rhs.data = m.mat * rho2.vec
-    rhs.data += tau * f.vec
+        rhs.data = m.mat * rho2.vec
+        rhs.data += tau * f.vec
 
-    mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
-    invmat = mstar.Inverse(fes.FreeDofs())
-    rho2.vec.data = invmat * rhs
+        mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
+        invmat = mstar.Inverse(fes.FreeDofs())
+        rho2.vec.data = invmat * rhs
 
-    Redraw(blocking=False)
-    times.append(t)
-    ents.append(Integrate(entropy, mesh))
-    line.set_xdata(times)
-    line.set_ydata(ents)
-    ax.relim()
-    ax.autoscale_view()
-    fig.canvas.draw()
+        Redraw(blocking=False)
+        times.append(t)
+        ents.append(Integrate(entropy, mesh))
+        line.set_xdata(times)
+        line.set_ydata(ents)
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
 
-    if vtkoutput:
-        vtk.Do()
+        if vtkoutput:
+            vtk.Do()

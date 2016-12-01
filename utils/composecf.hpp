@@ -22,9 +22,6 @@ namespace ngfem
   };
 }
 
-typedef PyWrapper<ngfem::CoefficientFunction> PyCF;
-PyCF MakeCoefficient (py::object val);
-
 namespace ngstd
 {
   template <> struct PyWrapperTraits<ngfem::ComposeCoefficientFunction> {
