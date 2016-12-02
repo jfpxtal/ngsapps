@@ -9,9 +9,8 @@ from ngsolve.comp import Region
 import matplotlib.pyplot as plt
 from ngsapps.utils import *
 
-# order = 3
-order = 2
-conv_order = 3
+order = 3
+conv_order = 6
 maxh = 0.15
 
 vtkoutput = False
@@ -30,15 +29,25 @@ V = CoefficientFunction(x)
 u = CoefficientFunction((1.0, 0.0))
 
 # partial derivatives of convolution kernel
-Kdx = -x*exp(-pow(x, 2)-pow(y, 2))
-Kdy = -y*exp(-pow(x, 2)-pow(y, 2))
+var = 200
+k0 = 1
+# K = k0*exp(-var*(x*x+y*y))
+Kdx = -2*k0*var*x*exp(-var*(x*x+y*y))
+Kdy = -2*k0*var*y*exp(-var*(x*x+y*y))
+
+# norm = sqrt(x*x+y*y)
+# width = 8
+# K = IfPos(1-norm/width, 1-norm/width, 0)
+# Kdx = IfPos(1-norm/width, -x/norm/width, 0)
+# Kdy = IfPos(1-norm/width, -y/norm/width, 0)
 
 # time step and end
 tau = 0.01
 tend = -1
 
 # jump penalty in asip below
-eta = 100
+# eta = 100
+eta = 50
 
 geo = SplineGeometry()
 # geo.AddRectangle((0, 0), (2, 1), bcs=[1, 2, 3, 4])
@@ -67,6 +76,7 @@ def MakePolygon(geo, pts, **args):
     for p1, p2 in zip(ptids, ptids[1:]+[ptids[0]]):
         geo.Append(['line', p1, p2], **args)
 
+# obstacles
 # geo.AddCircle((1.5, 0.5), 0.2, leftdomain=0, rightdomain=1)
 # MakePolygon(geo, [(1.3, 0.35), (1.6, 0.35), (1.6, 0.65)], leftdomain=0, rightdomain=1)
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
@@ -85,8 +95,10 @@ rho2.Set(CoefficientFunction(0.5))
 # set up coefficient functions for convolution terms
 # and caches to prevent unnecessary calculation in aconv.Assemble()
 convx = Convolve(rho2, Kdx, mesh, conv_order)
-convx_cache = Cache(convx, fes)
 convy = Convolve(rho2, Kdy, mesh, conv_order)
+# convx = Convolve(grad(rho2)[0], K, mesh, conv_order)
+# convy = Convolve(grad(rho2)[1], K, mesh, conv_order)
+convx_cache = Cache(convx, fes)
 convy_cache = Cache(convy, fes)
 
 # special values for DG
@@ -155,7 +167,7 @@ line, = ax.plot(times, ents)
 plt.show(block=False)
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/crowdtrans",subdivision=3)
+    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/gaussconv/gaussconv",subdivision=3)
     vtk.Do()
 
 input("Press any key...")
@@ -178,6 +190,7 @@ with TaskManager():
         rhs.data += tau * f.vec
 
         mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector() + aconv.mat.AsVector())
+        # mstar.AsVector().data = m.mat.AsVector() + tau * (asip.mat.AsVector() + aF.mat.AsVector() + aupw.mat.AsVector())
         invmat = mstar.Inverse(fes.FreeDofs())
         rho2.vec.data = invmat * rhs
 
@@ -192,3 +205,6 @@ with TaskManager():
 
         if vtkoutput:
             vtk.Do()
+
+        # if t > 0.75:
+        #     input()
