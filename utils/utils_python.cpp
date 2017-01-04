@@ -6,6 +6,7 @@
 #include "composecf.hpp"
 #include "convolutioncf.hpp"
 #include "cachecf.hpp"
+#include "zlogzcf.hpp"
 
 using namespace ngfem;
 
@@ -28,6 +29,16 @@ void ExportNgsAppsUtils(py::module &m)
               new (instance) PyRCF(make_shared<RandomCoefficientFunction> (lower, upper));
             },
           py::arg("lower")=0.0, py::arg("upper")=1.0
+      );
+
+  typedef PyWrapperDerived<ZLogZCoefficientFunction,CoefficientFunction> PyZLogZ;
+  py::class_<PyZLogZ, PyCF>
+    (m, "ZLogZCF")
+    .def("__init__",
+         [](PyZLogZ *instance, py::object cf)
+         {
+           new (instance) PyZLogZ(make_shared<ZLogZCoefficientFunction>(MakeCoefficient(cf).Get()));
+         }
       );
 
   typedef PyWrapperDerived<ComposeCoefficientFunction, CoefficientFunction> PyComposeCF;

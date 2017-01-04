@@ -28,13 +28,17 @@ beta2 = 0.2
 V = CoefficientFunction(x)
 u = CoefficientFunction((1.0, 0.0))
 
-# partial derivatives of convolution kernel
-var = 200
-k0 = 1
-# K = k0*exp(-var*(x*x+y*y))
-Kdx = -2*k0*var*x*exp(-var*(x*x+y*y))
-Kdy = -2*k0*var*y*exp(-var*(x*x+y*y))
+# convolution kernels
+# gaussian:
+thin = 200
+k0 = 5
+# k0 = 1
+# K = k0*exp(-thin*(x*x+y*y))
+# partial derivatives
+Kdx = -2*k0*thin*x*exp(-thin*(x*x+y*y))
+Kdy = -2*k0*thin*y*exp(-thin*(x*x+y*y))
 
+# compact support:
 # norm = sqrt(x*x+y*y)
 # width = 8
 # K = IfPos(1-norm/width, 1-norm/width, 0)
@@ -47,7 +51,8 @@ tend = -1
 
 # jump penalty in asip below
 # eta = 100
-eta = 50
+# eta = 50
+eta = 40
 
 geo = SplineGeometry()
 # geo.AddRectangle((0, 0), (2, 1), bcs=[1, 2, 3, 4])
@@ -120,9 +125,14 @@ aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'), skeleto
 aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'), skeleton=True)
 aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=True)
 
+gx = GridFunction(fes)
+gx.Set(convx)
+gy = GridFunction(fes)
+gy.Set(convy)
 # convolution term
 aconv = BilinearForm(fes)
-convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx_cache, convy_cache))*grad(phi))
+# convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((convx_cache, convy_cache))*grad(phi))
+convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((gx, gy))*grad(phi))
 # convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx, convy))*grad(phi))
 aconv += convbfi
 convx_cache.SetBFI(convbfi)
@@ -160,17 +170,18 @@ mstar = asip.mat.CreateMatrix()
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
-entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
+# entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
+entropy = ZLogZCF(rho2) - rho2*V + ZLogZCF(1-rho2)
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/gaussconv/gaussconv",subdivision=3)
+    vtk = MyVTKOutput(ma=mesh,coefs=[rho2],names=["rho"],filename="crowdtrans/oneminusrho/oneminusrho",subdivision=3)
     vtk.Do()
 
-input("Press any key...")
+# input("Press any key...")
 # semi-implicit Euler
 t = 0.0
 with TaskManager():
@@ -181,8 +192,8 @@ with TaskManager():
         print('Assembling aupw...')
         aupw.Assemble()
         print('Calculating convolution integrals...')
-        convx_cache.Refresh()
-        convy_cache.Refresh()
+        gx.Set(convx)
+        gy.Set(convy)
         print('Assembling aconv...')
         aconv.Assemble()
 

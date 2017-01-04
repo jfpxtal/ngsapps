@@ -5,18 +5,35 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   composecf.hpp composecf.cpp
   convolutioncf.hpp convolutioncf.cpp
   cachecf.hpp cachecf.cpp
+  zlogzcf.hpp zlogzcf.cpp
   )
+
+# include_directories(${MPI_INCLUDE_PATH})
+# SET(CMAKE_BUILD_TYPE Debug)
+# add_executable(racecond racecond.cpp)
+# if(MPI_COMPILE_FLAGS)
+#   set_target_properties(racecond PROPERTIES
+#     COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+# endif()
+
+# if(MPI_LINK_FLAGS)
+#   set_target_properties(racecond PROPERTIES
+#     LINK_FLAGS "${MPI_LINK_FLAGS}")
+# endif()
+find_package (Threads)
+# target_link_libraries(racecond ${CMAKE_THREAD_LIBS_INIT} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${NETGEN_LIBS})
 
 set_target_properties(ngsapps_utils PROPERTIES SUFFIX ".so")
 
 if(NOT WIN32)
-    target_link_libraries(ngsapps_utils ${PYTHON_LIBS} ${LAPACK_LIBRARIES} ${NETGEN_LIBS})
+  message(STATUS ${NETGEN_LIBS})
+    target_link_libraries(ngsapps_utils ${PYTHON_LIBS} ${LAPACK_LIBRARIES} ${NETGEN_LIBS} ${CMAKE_THREAD_LIBS_INIT})
   install( TARGETS ngsapps_utils ${ngs_install_dir})
 endif(NOT WIN32)
 
 if(USE_PYTHON)
     install (FILES
-            utils.py 
+            utils.py
             DESTINATION ${PYTHON_PACKAGES_INSTALL_DIR}/ngsapps
             COMPONENT ngsapps
             )
