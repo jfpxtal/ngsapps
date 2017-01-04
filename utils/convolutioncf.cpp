@@ -2,6 +2,32 @@
 
 namespace ngfem
 {
+  // void MyCoordCoefficientFunction::PrintReport (ostream & ost) const
+  // {
+  //   if (this->Dimension() == 1)
+  //     ost << "x";
+  //   else if (this->Dimension() == 2)
+  //     ost << "(x, y)"
+  //   else
+  //     ost << "(x, y, z)"
+  // }
+
+  // void MyCoordCoefficientFunction::TraverseTree (const function<void(CoefficientFunction&)> & func)
+  // {
+  //   func(*this);
+  // }
+
+  // double MyCoordCoefficientFunction::Evaluate (const BaseMappedIntegrationPoint & ip) const
+  // {
+  //   return ip.GetPoint()(0);
+  // }
+
+  // void MyCoordCoefficientFunction::Evaluate(const BaseMappedIntegrationPoint & ip,
+  //                                           FlatVector<> result) const
+  // {
+  //   result = ip.GetPoint();
+  // }
+
   ConvolutionCoefficientFunction::ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                               shared_ptr<CoefficientFunction> ac2,
                               shared_ptr<ngcomp::MeshAccess> ama, int aorder)
@@ -41,8 +67,7 @@ namespace ngfem
     {
       HeapReset hr(lh);
       ElementId ei(VOL, i);
-      ngcomp::Ngs_Element el(ma->GetElement(ei), ei);
-      auto & trafo = ma->GetTrafo (el, lh);
+      auto & trafo = ma->GetTrafo (ei, lh);
       Vector<> hsum(dim);
       hsum = 0.0;
 
@@ -65,6 +90,59 @@ namespace ngfem
     }
 
     return sum(0);
+  }
+
+  void ConvolutionCoefficientFunction :: Evaluate (const BaseMappedIntegrationRule & ir,
+                                                FlatMatrix<double> values) const
+  {
+    auto points = ir.GetPoints();
+    auto lh = LocalHeap(100000, "convolutioncf lh", true);
+    values = 0;
+    // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task
+    // because TaskManager gets stuck on nested tasks
+    for (auto i : Range(ma->GetNE()))
+    {
+      HeapReset hr(lh);
+      ElementId ei(VOL, i);
+      auto & trafo = ma->GetTrafo (ei, lh);
+
+      IntegrationRule convIR(trafo.GetElementType(), order);
+      BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
+      FlatMatrix<> vals1(convIR.Size(), 1, lh);
+      c1->Evaluate (convMIR, vals1);
+      auto mirpts = convMIR.GetPoints();
+
+      for (auto j : Range(ir.Size()))
+      {
+        for (auto k : Range(convMIR.Size()))
+        {
+          FlatVector<double> newpt = points.Row(j) - mirpts.Row(k) | lh;
+          // trafo is probably the wrong ElementTransformation for the new point
+          // but it doesn't matter as long as c2 only uses the actual point, not the trafo
+          BaseMappedIntegrationPoint *mip;
+          switch (trafo.SpaceDim())
+          {
+          case 1: {
+            auto dmip = new (lh) DimMappedIntegrationPoint<1>(IntegrationPoint(), trafo);
+            dmip->Point() = newpt;
+            mip = dmip;
+            break; }
+          case 2: {
+            auto dmip = new (lh) DimMappedIntegrationPoint<2>(IntegrationPoint(), trafo);
+            dmip->Point() = newpt;
+            mip = dmip;
+            break; }
+          case 3: {
+            auto dmip = new (lh) DimMappedIntegrationPoint<3>(IntegrationPoint(), trafo);
+            dmip->Point() = newpt;
+            mip = dmip;
+            break; }
+          }
+          values(j, 0) += convMIR[k].GetWeight() * vals1(k) * c2->Evaluate(*mip);
+        }
+      }
+
+    }
   }
 
   // double ConvolutionCoefficientFunction::EvaluateConst () const

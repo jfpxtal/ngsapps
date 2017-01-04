@@ -3,6 +3,18 @@
 
 namespace ngfem
 {
+  // class MyCoordCoefficientFunction : public CoefficientFunction
+  // {
+  // public:
+  //   MyCoordCoefficientFunction (int dim) : CoefficientFunction(dim, false) {}
+  //   virtual ~MyCoordCoefficientFunction () {}
+  //   ///
+  //   virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
+  //   virtual void Evaluate (const BaseMappedIntegrationPoint & ip, FlatVector<> result) const;
+  //   virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);
+  //   virtual void PrintReport (ostream & ost) const;
+  // };
+
   class ConvolutionCoefficientFunction : public CoefficientFunction
   {
     shared_ptr<CoefficientFunction> c1;
@@ -16,6 +28,8 @@ namespace ngfem
     virtual ~ConvolutionCoefficientFunction ();
     ///
     virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
+    virtual void Evaluate (const BaseMappedIntegrationRule & ir,
+                           FlatMatrix<double> values) const;
     // virtual double EvaluateConst () const;
     // virtual void Evaluate (const BaseMappedIntegrationPoint & ip, FlatVector<> result) const;
     virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);

@@ -8,26 +8,12 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   zlogzcf.hpp zlogzcf.cpp
   )
 
-# include_directories(${MPI_INCLUDE_PATH})
-# SET(CMAKE_BUILD_TYPE Debug)
-# add_executable(racecond racecond.cpp)
-# if(MPI_COMPILE_FLAGS)
-#   set_target_properties(racecond PROPERTIES
-#     COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-# endif()
-
-# if(MPI_LINK_FLAGS)
-#   set_target_properties(racecond PROPERTIES
-#     LINK_FLAGS "${MPI_LINK_FLAGS}")
-# endif()
-find_package (Threads)
-# target_link_libraries(racecond ${CMAKE_THREAD_LIBS_INIT} ${MPI_LIBRARIES} ${LAPACK_LIBRARIES} ${NETGEN_LIBS})
 
 set_target_properties(ngsapps_utils PROPERTIES SUFFIX ".so")
 
 if(NOT WIN32)
   message(STATUS ${NETGEN_LIBS})
-    target_link_libraries(ngsapps_utils ${PYTHON_LIBS} ${LAPACK_LIBRARIES} ${NETGEN_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(ngsapps_utils ${PYTHON_LIBS} ${LAPACK_LIBRARIES} ${NETGEN_LIBS})
   install( TARGETS ngsapps_utils ${ngs_install_dir})
 endif(NOT WIN32)
 
