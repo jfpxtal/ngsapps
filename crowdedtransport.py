@@ -33,10 +33,10 @@ u = CoefficientFunction((1.0, 0.0))
 thin = 200
 k0 = 5
 # k0 = 1
-# K = k0*exp(-thin*(x*x+y*y))
+K = k0*exp(-thin*(x*x+y*y))
 # partial derivatives
-Kdx = -2*k0*thin*x*exp(-thin*(x*x+y*y))
-Kdy = -2*k0*thin*y*exp(-thin*(x*x+y*y))
+# Kdx = -2*k0*thin*x*exp(-thin*(x*x+y*y))
+# Kdy = -2*k0*thin*y*exp(-thin*(x*x+y*y))
 
 # compact support:
 # norm = sqrt(x*x+y*y)
@@ -99,12 +99,14 @@ rho2.Set(CoefficientFunction(0.5))
 
 # set up coefficient functions for convolution terms
 # and caches to prevent unnecessary calculation in aconv.Assemble()
-convx = Convolve(rho2, Kdx, mesh, conv_order)
-convy = Convolve(rho2, Kdy, mesh, conv_order)
+# convx = Convolve(rho2, Kdx, mesh, conv_order)
+# convy = Convolve(rho2, Kdy, mesh, conv_order)
+conv = Convolve(rho2, GaussKernel(scal=5, var=200), mesh, conv_order)
+# conv = Convolve(rho2, K, mesh, conv_order)
 # convx = Convolve(grad(rho2)[0], K, mesh, conv_order)
 # convy = Convolve(grad(rho2)[1], K, mesh, conv_order)
-convx_cache = Cache(convx, fes)
-convy_cache = Cache(convy, fes)
+# convx_cache = Cache(convx, fes)
+# convy_cache = Cache(convy, fes)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -125,21 +127,23 @@ aF += SymbolicBFI(alpha2*rho*phi, definedon=Region(mesh, BND, 'alpha2'), skeleto
 aF += SymbolicBFI(beta1*rho*phi, definedon=Region(mesh, BND, 'beta1'), skeleton=True)
 aF += SymbolicBFI(beta2*rho*phi, definedon=Region(mesh, BND, 'beta2'), skeleton=True)
 
-gx = GridFunction(fes)
-gx.Set(convx)
-gy = GridFunction(fes)
-gy.Set(convy)
-# convolution term
-aconv = BilinearForm(fes)
-# convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((convx_cache, convy_cache))*grad(phi))
-convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((gx, gy))*grad(phi))
-# convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx, convy))*grad(phi))
-aconv += convbfi
-convx_cache.SetBFI(convbfi)
-convy_cache.SetBFI(convbfi)
-
 def abs(x):
     return IfPos(x, x, -x)
+
+g = GridFunction(fes)
+# convolution term
+aconv = BilinearForm(fes)
+aconv += SymbolicBFI(-rho*(1-rho2)*grad(g)*grad(phi))
+aconv += SymbolicBFI((1-rho2)*grad(g)*n*0.5*(rho+rho.Other())*(phi-phi.Other()), skeleton=True)
+aconv += SymbolicBFI(0.5*abs((1-rho2)*grad(g)*n) * (rho - rho.Other())*(phi - phi.Other()), skeleton=True)
+# convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((convx_cache, convy_cache))*grad(phi))
+# convbfi = SymbolicBFI_NoDG(-rho*(1-rho2)*CoefficientFunction((gx, gy))*grad(phi))
+# convbfi = SymbolicBFI_NoDG(-rho*CoefficientFunction((convx, convy))*grad(phi))
+# aconv += convbfi
+
+# convx_cache.SetBFI(convbfi)
+# convy_cache.SetBFI(convbfi)
+
 
 # upwind scheme for the advection
 aupw = BilinearForm(fes)
@@ -170,8 +174,7 @@ mstar = asip.mat.CreateMatrix()
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
-# entropy = rho2*log(rho2) - rho2*V + (1-rho2)*log(1-rho2)
-entropy = ZLogZCF(rho2) - rho2*V + ZLogZCF(1-rho2)
+entropy = ZLogZCF(rho2) - rho2*V + ZLogZCF(1-rho2) + rho2*conv
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
@@ -192,8 +195,7 @@ with TaskManager():
         print('Assembling aupw...')
         aupw.Assemble()
         print('Calculating convolution integrals...')
-        gx.Set(convx)
-        gy.Set(convy)
+        g.Set(conv)
         print('Assembling aconv...')
         aconv.Assemble()
 

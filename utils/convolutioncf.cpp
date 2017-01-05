@@ -2,32 +2,6 @@
 
 namespace ngfem
 {
-  // void MyCoordCoefficientFunction::PrintReport (ostream & ost) const
-  // {
-  //   if (this->Dimension() == 1)
-  //     ost << "x";
-  //   else if (this->Dimension() == 2)
-  //     ost << "(x, y)"
-  //   else
-  //     ost << "(x, y, z)"
-  // }
-
-  // void MyCoordCoefficientFunction::TraverseTree (const function<void(CoefficientFunction&)> & func)
-  // {
-  //   func(*this);
-  // }
-
-  // double MyCoordCoefficientFunction::Evaluate (const BaseMappedIntegrationPoint & ip) const
-  // {
-  //   return ip.GetPoint()(0);
-  // }
-
-  // void MyCoordCoefficientFunction::Evaluate(const BaseMappedIntegrationPoint & ip,
-  //                                           FlatVector<> result) const
-  // {
-  //   result = ip.GetPoint();
-  // }
-
   ConvolutionCoefficientFunction::ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                               shared_ptr<CoefficientFunction> ac2,
                               shared_ptr<ngcomp::MeshAccess> ama, int aorder)

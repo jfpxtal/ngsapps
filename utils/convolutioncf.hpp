@@ -35,11 +35,19 @@ namespace ngfem
     virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);
     virtual void PrintReport (ostream & ost) const;
   };
-}
 
-namespace ngstd
-{
-  template <> struct PyWrapperTraits<ngfem::ConvolutionCoefficientFunction> {
-    typedef PyWrapperDerived<ngfem::ConvolutionCoefficientFunction, ngfem::CoefficientFunction> type;
+  class GaussKernel : public CoefficientFunction
+  {
+  private:
+    double scal, var;
+  public:
+    GaussKernel(double ascal, double avar) : CoefficientFunction(1), scal(ascal), var(avar) {}
+
+    virtual double Evaluate(const BaseMappedIntegrationPoint &ip) const
+    {
+      auto point = ip.GetPoint();
+      return scal * exp(-var * (point[0]*point[0] + point[1]*point[1]));
+    }
   };
+
 }

@@ -31,6 +31,17 @@ void ExportNgsAppsUtils(py::module &m)
           py::arg("lower")=0.0, py::arg("upper")=1.0
       );
 
+  typedef PyWrapperDerived<GaussKernel,CoefficientFunction> PyGaussCF;
+  py::class_<PyGaussCF, PyCF>
+    (m, "GaussKernel")
+    .def("__init__",
+         [](PyGaussCF *instance, double scal, double var)
+         {
+           new (instance) PyGaussCF(make_shared<GaussKernel> (scal, var));
+         },
+         py::arg("scal")=1.0, py::arg("var")=1.0
+      );
+
   typedef PyWrapperDerived<ZLogZCoefficientFunction,CoefficientFunction> PyZLogZ;
   py::class_<PyZLogZ, PyCF>
     (m, "ZLogZCF")
