@@ -27,15 +27,20 @@ eta = 100
 
 # geometry and mesh
 geo = SplineGeometry()
-geo.SetMaterial(1, 'vis1')
-geo.SetMaterial(2, 'vis2')
+# set up two rectangles
+# the top one is used as domain for the actual calculations and for the visualization of species red
+# the bottom one is only used for visualization of species blue
+geo.SetMaterial(1, 'top')
+geo.SetMaterial(2, 'bottom')
 geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
 geo.AddRectangle((0, -1.3), (2, -0.3), leftdomain=2)
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
+topMat = mesh.Materials('top')
 
 # finite element space
 fes1 = L2(mesh, order=order)
-fes = FESpace([fes1, fes1], flags={'definedon': ['vis1'], 'dgjumps': True})
+# calculations only on top rectangle
+fes = FESpace([fes1, fes1], flags={'definedon': ['top'], 'dgjumps': True})
 
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
@@ -44,10 +49,10 @@ tr, tb = fes.TestFunction()
 s = GridFunction(fes)
 r2 = s.components[0]
 b2 = s.components[1]
-# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=mesh.Materials('vis1'))
-# b2.Set(IfPos(x-1.8, 0.6, 0), definedon=mesh.Materials('vis1'))
-r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=mesh.Materials('vis1'))
-b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=mesh.Materials('vis1'))
+# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=topMat)
+# b2.Set(IfPos(x-1.8, 0.6, 0), definedon=topMat)
+r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
+b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -70,35 +75,35 @@ wr = wb = 0.5
 
 # equation for r
 a += SymbolicBFI(Dr*grad(r)*grad(tr))
-a += SymbolicBFI(-Dr*0.5*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*0.5*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(Dr*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(-Dr*0.5*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Dr*0.5*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Dr*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
 
 a += SymbolicBFI(-Dr*b2*grad(r)*grad(tr))
-a += SymbolicBFI(Dr*wb*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(Dr*wb*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*2*wb*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(Dr*wb*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Dr*wb*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Dr*2*wb*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
 
 a += SymbolicBFI(Dr*r2*grad(b)*grad(tr))
-a += SymbolicBFI(-Dr*wr*(grad(b) + grad(b.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*wr*(grad(tr)+grad(tr.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(Dr*2*wr*eta / h * (b - b.Other()) * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(-Dr*wr*(grad(b) + grad(b.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Dr*wr*(grad(tr)+grad(tr.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Dr*2*wr*eta / h * (b - b.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
 
 # equation for b
 a += SymbolicBFI(Db*grad(b)*grad(tb))
-a += SymbolicBFI(-Db*0.5*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(-Db*0.5*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(Db*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(-Db*0.5*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Db*0.5*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Db*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
 
 a += SymbolicBFI(-Db*r2*grad(b)*grad(tb))
-a += SymbolicBFI(Db*wr*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(Db*wr*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(-Db*2*wr*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(Db*wr*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Db*wr*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Db*2*wr*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
 
 a += SymbolicBFI(Db*b2*grad(r)*grad(tb))
-a += SymbolicBFI(-Db*wb*(grad(r) + grad(r.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(-Db*wb*(grad(tb) + grad(tb.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(Db*2*wb*eta / h * (r - r.Other()) * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(-Db*wb*(grad(r) + grad(r.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Db*wb*(grad(tb) + grad(tb.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Db*2*wb*eta / h * (r - r.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -108,13 +113,13 @@ def abs(x):
 
 # equation for r
 a += SymbolicBFI(-r*(1-r2-b2)*gradVr*grad(tr))
-a += SymbolicBFI((1-r2-b2)*gradVr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True)
+a += SymbolicBFI((1-r2-b2)*gradVr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
 
 # equation for b
 a += SymbolicBFI(-b*(1-r2-b2)*gradVb*grad(tb))
-a += SymbolicBFI((1-r2-b2)*gradVb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True)
+a += SymbolicBFI((1-r2-b2)*gradVb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
 
 # mass matrix
 m = BilinearForm(fes)
@@ -129,17 +134,19 @@ mstar = m.mat.CreateMatrix()
 
 # Draw(r2, mesh, 'r')
 # Draw(b2, mesh, 'b')
+# visualize both species at the same time, red in top rectangle, blue in bottom
+# translate density b2 of blue species to bottom rectangle
 both = r2 + Compose((x, y+1.3), b2, mesh)
 Draw(both, mesh, 'both')
 
 times = [0.0]
-entropy = r2*log(r2) + b2*log(b2) + (1-r2-b2)*log(1-r2-b2) + r2*Vr + b2*Vb
-ents = [Integrate(entropy, mesh, definedon=mesh.Materials('vis1'))]
+entropy = ZLogZCF(r2) + ZLogZCF(b2) + ZLogZCF(1-r2-b2) + r2*Vr + b2*Vb
+ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
-input("Press any key...")
+# input("Press any key...")
 # semi-implicit Euler
 t = 0.0
 with TaskManager():
@@ -158,7 +165,7 @@ with TaskManager():
 
         Redraw(blocking=False)
         times.append(t)
-        ents.append(Integrate(entropy, mesh, definedon=mesh.Materials('vis1')))
+        ents.append(Integrate(entropy, mesh, definedon=topMat))
         line.set_xdata(times)
         line.set_ydata(ents)
         ax.relim()
