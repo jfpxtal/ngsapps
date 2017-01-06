@@ -64,6 +64,8 @@ convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
+gridr.Set(Vr+convr, definedon=topMat)
+gridb.Set(Vb+convb, definedon=topMat)
 velocityr = (1-r2-b2)*grad(gridr)
 velocityb = (1-r2-b2)*grad(gridb)
 
@@ -153,7 +155,7 @@ both = r2 + Compose((x, y+1.3), b2, mesh)
 Draw(both, mesh, 'both')
 
 times = [0.0]
-entropy = ZLogZCF(r2) + ZLogZCF(b2) + ZLogZCF(1-r2-b2) + r2*Vr + b2*Vb
+entropy = ZLogZCF(r2) + ZLogZCF(b2) + ZLogZCF(1-r2-b2) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
