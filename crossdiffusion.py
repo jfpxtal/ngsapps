@@ -6,6 +6,8 @@ from ngsapps.utils import *
 order = 3
 maxh = 0.15
 
+convOrder = 3;
+
 # diffusion coefficients
 # red species
 Dr = 0.1
@@ -13,8 +15,8 @@ Dr = 0.1
 Db = 0.3
 
 # advection potentials
-gradVr = CoefficientFunction((1.0, 0.0))
-gradVb = -gradVr
+# gradVr = CoefficientFunction((1.0, 0.0))
+# gradVb = -gradVr
 Vr = x
 Vb = -x
 
@@ -53,6 +55,17 @@ b2 = s.components[1]
 # b2.Set(IfPos(x-1.8, 0.6, 0), definedon=topMat)
 r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
 b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
+
+# convolution
+convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
+convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
+
+# GridFunctions for caching of convolution values and automatic gradient calculation
+grid = GridFunction(fes)
+gridr = grid.components[0]
+gridb = grid.components[1]
+velocityr = (1-r2-b2)*grad(gridr)
+velocityb = (1-r2-b2)*grad(gridb)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -112,14 +125,14 @@ def abs(x):
 # missing boundary term??
 
 # equation for r
-a += SymbolicBFI(-r*(1-r2-b2)*gradVr*grad(tr))
-a += SymbolicBFI((1-r2-b2)*gradVr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-r*velocityr*grad(tr))
+a += SymbolicBFI(velocityr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(0.5*abs(velocityr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
 
 # equation for b
-a += SymbolicBFI(-b*(1-r2-b2)*gradVb*grad(tb))
-a += SymbolicBFI((1-r2-b2)*gradVb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(0.5*abs((1-r2-b2)*gradVb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-b*velocityb*grad(tb))
+a += SymbolicBFI(velocityb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(0.5*abs(velocityb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
 
 # mass matrix
 m = BilinearForm(fes)
@@ -154,6 +167,9 @@ with TaskManager():
         print("\nt = {:10.6e}".format(t))
         t += tau
 
+        print('Calculating convolution integrals...')
+        gridr.Set(Vr+convr, definedon=topMat)
+        gridb.Set(Vb+convb, definedon=topMat)
         print('Assembling a...')
         a.Assemble()
 
