@@ -40,7 +40,7 @@ mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 topMat = mesh.Materials('top')
 
 # finite element space
-fes1 = L2(mesh, order=order)
+fes1 = L2(mesh, order=order, flags={'definedon': ['top']})
 # calculations only on top rectangle
 fes = FESpace([fes1, fes1], flags={'definedon': ['top'], 'dgjumps': True})
 
