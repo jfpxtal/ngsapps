@@ -1,13 +1,22 @@
 #include "convolutioncf.hpp"
 
+#include "utils.hpp"
+
 namespace ngfem
 {
   ConvolutionCoefficientFunction::ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                               shared_ptr<CoefficientFunction> ac2,
                               shared_ptr<ngcomp::MeshAccess> ama, int aorder)
   : CoefficientFunction(ac1->Dimension(), ac1->IsComplex()),
-    c1(ac1), c2(ac2), ma(ama), order(aorder)
-  {}
+    c1(ac1), c2(ac2), ma(ama), order(aorder),
+    kernelLUT(ma->GetNE()), totalConvIRSize(0)
+  {
+    // TODO: switch to FESpace as argument, use FESpace->Elements
+    for (auto &&el : ma->Elements())
+    {
+      totalConvIRSize += IntegrationRule(el.GetType(), order).Size();
+    }
+  }
 
   ConvolutionCoefficientFunction::~ConvolutionCoefficientFunction ()
   {}
@@ -30,6 +39,7 @@ namespace ngfem
 
   double ConvolutionCoefficientFunction::Evaluate (const BaseMappedIntegrationPoint & ip) const
   {
+    // TODO: kernelLUT
     int dim = c1->Dimension();
     auto point = ip.GetPoint();
     Vector<> sum(dim);
@@ -56,6 +66,7 @@ namespace ngfem
         mirpts.Row(i) += point;
       // at this point, mir probably has the wrong ElementTransformation
       // but it doesn't matter as long as c2 only uses the global points
+      // TODO: ip.SetNr(-666)
       c2->Evaluate (mir, vals2);
       for (int i = 0; i < vals1.Height(); i++)
         hsum += mir[i].GetWeight() * vals1.Row(i) * vals2.Row(i);
@@ -69,53 +80,68 @@ namespace ngfem
   void ConvolutionCoefficientFunction :: Evaluate (const BaseMappedIntegrationRule & ir,
                                                 FlatMatrix<double> values) const
   {
-    auto points = ir.GetPoints();
+    // TODO: test test test
     auto lh = LocalHeap(100000, "convolutioncf lh", true);
     values = 0;
-    // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task
-    // because TaskManager gets stuck on nested tasks
-    for (auto i : Range(ma->GetNE()))
+
+    auto &irSizeMap = kernelLUT[ir.GetTransformation().GetElementNr()].first;
+    auto it = irSizeMap.find(ir.Size());
+    if (it == irSizeMap.end())
     {
-      HeapReset hr(lh);
-      ElementId ei(VOL, i);
-      auto & trafo = ma->GetTrafo (ei, lh);
-
-      IntegrationRule convIR(trafo.GetElementType(), order);
-      BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
-      FlatMatrix<> vals1(convIR.Size(), 1, lh);
-      c1->Evaluate (convMIR, vals1);
-      auto mirpts = convMIR.GetPoints();
-
-      for (auto j : Range(ir.Size()))
+      auto noconst = const_cast<ConvolutionCoefficientFunction*>(this);
+      auto &irElEntry = noconst->kernelLUT[ir.GetTransformation().GetElementNr()];
+      std::lock_guard<std::mutex> guard(irElEntry.second);
+      // cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
+      auto &mat = irElEntry.first.insert(make_pair(ir.Size(), Matrix<>(ir.Size(), totalConvIRSize))).first->second;
+      auto points = ir.GetPoints();
+      int col = 0;
+      // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task
+      // because TaskManager gets stuck on nested tasks
+      for (auto i : Range(ma->GetNE()))
       {
-        for (auto k : Range(convMIR.Size()))
+        HeapReset hr(lh);
+        ElementId ei(VOL, i);
+        auto & trafo = ma->GetTrafo (ei, lh);
+
+        IntegrationRule convIR(trafo.GetElementType(), order);
+        BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
+        FlatMatrix<> vals1(convIR.Size(), 1, lh);
+
+        c1->Evaluate (convMIR, vals1);
+
+        auto mirpts = convMIR.GetPoints();
+
+        for (auto j : Range(ir.Size()))
         {
-          FlatVector<double> newpt = points.Row(j) - mirpts.Row(k) | lh;
-          // trafo is probably the wrong ElementTransformation for the new point
-          // but it doesn't matter as long as c2 only uses the actual point, not the trafo
-          BaseMappedIntegrationPoint *mip;
-          switch (trafo.SpaceDim())
+          for (auto k : Range(convMIR.Size()))
           {
-          case 1: {
-            auto dmip = new (lh) DimMappedIntegrationPoint<1>(IntegrationPoint(), trafo);
-            dmip->Point() = newpt;
-            mip = dmip;
-            break; }
-          case 2: {
-            auto dmip = new (lh) DimMappedIntegrationPoint<2>(IntegrationPoint(), trafo);
-            dmip->Point() = newpt;
-            mip = dmip;
-            break; }
-          case 3: {
-            auto dmip = new (lh) DimMappedIntegrationPoint<3>(IntegrationPoint(), trafo);
-            dmip->Point() = newpt;
-            mip = dmip;
-            break; }
+            FlatVector<double> newpt = points.Row(j) - mirpts.Row(k) | lh;
+            // dummy MIP doesn't have the correct ElementTransformation
+            // but it doesn't matter as long as c2 only uses the actual point, not the trafo
+            // should be ok for most convolution kernels
+            auto val2 = convMIR[k].GetWeight() * c2->Evaluate(DummyMIPFromPoint(newpt, lh));
+            mat(j, col+k) = val2;
+            values(j, 0) += vals1(k) * val2;
           }
-          values(j, 0) += convMIR[k].GetWeight() * vals1(k) * c2->Evaluate(*mip);
         }
+        col += convIR.Size();
       }
 
+    } else {
+      int col = 0;
+      for (auto i : Range(ma->GetNE()))
+      {
+        HeapReset hr(lh);
+        ElementId ei(VOL, i);
+        auto & trafo = ma->GetTrafo (ei, lh);
+        IntegrationRule convIR(trafo.GetElementType(), order);
+        BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
+        FlatMatrix<> vals1(convIR.Size(), 1, lh);
+
+        c1->Evaluate(convMIR, vals1);
+        values += it->second.Cols(col, col+convIR.Size()) * vals1;
+        col += convIR.Size();
+      }
     }
   }
 

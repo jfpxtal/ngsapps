@@ -6,6 +6,7 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   convolutioncf.hpp convolutioncf.cpp
   cachecf.hpp cachecf.cpp
   zlogzcf.hpp zlogzcf.cpp
+  utils.hpp utils.cpp
   )
 
 
@@ -24,4 +25,3 @@ if(USE_PYTHON)
             COMPONENT ngsapps
             )
 endif(USE_PYTHON)
-

@@ -1,19 +1,11 @@
+#pragma once
+
+#include <bla.hpp>
 #include <comp.hpp>
 #include <python_ngstd.hpp>
 
 namespace ngfem
 {
-  // class MyCoordCoefficientFunction : public CoefficientFunction
-  // {
-  // public:
-  //   MyCoordCoefficientFunction (int dim) : CoefficientFunction(dim, false) {}
-  //   virtual ~MyCoordCoefficientFunction () {}
-  //   ///
-  //   virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
-  //   virtual void Evaluate (const BaseMappedIntegrationPoint & ip, FlatVector<> result) const;
-  //   virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);
-  //   virtual void PrintReport (ostream & ost) const;
-  // };
 
   class ConvolutionCoefficientFunction : public CoefficientFunction
   {
@@ -21,6 +13,15 @@ namespace ngfem
     shared_ptr<CoefficientFunction> c2;
     shared_ptr<ngcomp::MeshAccess> ma;
     int order;
+
+    // IntegrationRule sizes for the given order, summed over all elements
+    int totalConvIRSize;
+
+    // lookup table for kernel values
+    // ASSUMPTION: IntegrationRules given as input of Evaluate() during the lifetime
+    // of this ConvolutionCF can be uniquely identified by their Size() and the
+    // corresponding element
+    vector<pair<map<int, typename ngbla::Matrix<>>, mutex>> kernelLUT;
   public:
     ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                                     shared_ptr<CoefficientFunction> ac2,
@@ -36,18 +37,87 @@ namespace ngfem
     virtual void PrintReport (ostream & ost) const;
   };
 
-  class GaussKernel : public CoefficientFunction
+  class LambdaCoefficientFunction : public CoefficientFunction
   {
-  private:
+    std::function<double(double, double)> func;
+
+  public:
+    LambdaCoefficientFunction(std::function<double(double, double)> f) : CoefficientFunction(1), func(std::move(f)) {}
+
+    virtual double Evaluate(const BaseMappedIntegrationPoint &ip) const
+    {
+      auto point = ip.GetPoint();
+      return func(point[0], point[1]);
+    }
+  };
+
+  class GaussCoefficientFunction : public CoefficientFunction
+  {
+  protected:
     double scal, var;
   public:
-    GaussKernel(double ascal, double avar) : CoefficientFunction(1), scal(ascal), var(avar) {}
+    GaussCoefficientFunction(double ascal, double avar) : CoefficientFunction(1), scal(ascal), var(avar) {}
+  };
+
+  class GaussKernelDx : public GaussCoefficientFunction
+  {
+  public:
+    using GaussCoefficientFunction::GaussCoefficientFunction;
+
+    virtual double Evaluate(const BaseMappedIntegrationPoint &ip) const
+      {
+        auto point = ip.GetPoint();
+        auto &x = point[0];
+        auto &y = point[1];
+        return -2*x*scal*var*exp(-var * (x*x + y*y));
+      }
+  };
+
+  class GaussKernelDy : public GaussCoefficientFunction
+  {
+  public:
+    using GaussCoefficientFunction::GaussCoefficientFunction;
+
+    virtual double Evaluate(const BaseMappedIntegrationPoint &ip) const
+      {
+        auto point = ip.GetPoint();
+        auto &x = point[0];
+        auto &y = point[1];
+        return -2*y*scal*var*exp(-var * (x*x + y*y));
+      }
+  };
+
+  class GaussKernel : public GaussCoefficientFunction
+  {
+  public:
+    using GaussCoefficientFunction::GaussCoefficientFunction;
 
     virtual double Evaluate(const BaseMappedIntegrationPoint &ip) const
     {
       auto point = ip.GetPoint();
       return scal * exp(-var * (point[0]*point[0] + point[1]*point[1]));
     }
+
+    std::shared_ptr<CoefficientFunction> Dx() const { return std::make_shared<GaussKernelDx>(scal, var); }
+    std::shared_ptr<CoefficientFunction> Dy() const { return std::make_shared<GaussKernelDy>(scal, var); }
+
+    // std::shared_ptr<LambdaCoefficientFunction> Dx() const
+    // {
+    //   auto lscal = scal;
+    //   auto lvar = var;
+    //   return std::make_shared<LambdaCoefficientFunction>([lscal, lvar](auto x, auto y) {
+    //       return -2*x*lscal*lvar*exp(-lvar * (x*x + y*y));
+    //     });
+    // }
+
+    // std::shared_ptr<LambdaCoefficientFunction> Dy() const
+    //   {
+    //     auto lscal = scal;
+    //     auto lvar = var;
+    //     return std::make_shared<LambdaCoefficientFunction>([lscal, lvar](auto x, auto y) {
+    //           return -2*y*lscal*lvar*exp(-lvar * (x*x + y*y));
+    //         });
+    //   }
   };
 
 }
