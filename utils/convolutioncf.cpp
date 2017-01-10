@@ -84,15 +84,17 @@ namespace ngfem
     auto lh = LocalHeap(100000, "convolutioncf lh", true);
     values = 0;
 
-    auto &irSizeMap = kernelLUT[ir.GetTransformation().GetElementNr()].first;
+    auto &lutElEntry = kernelLUT[ir.GetTransformation().GetElementNr()];
+    auto &irSizeMap = lutElEntry.first;
+    shared_lock<shared_timed_mutex> readLock(lutElEntry.second);
     auto it = irSizeMap.find(ir.Size());
     if (it == irSizeMap.end())
     {
-      auto noconst = const_cast<ConvolutionCoefficientFunction*>(this);
-      auto &irElEntry = noconst->kernelLUT[ir.GetTransformation().GetElementNr()];
-      std::lock_guard<std::mutex> guard(irElEntry.second);
+      readLock.unlock();
+      unique_lock<shared_timed_mutex> writeLock(lutElEntry.second);
+
       // cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
-      auto &mat = irElEntry.first.insert(make_pair(ir.Size(), Matrix<>(ir.Size(), totalConvIRSize))).first->second;
+      auto &mat = irSizeMap.emplace(ir.Size(), Matrix<>(ir.Size(), totalConvIRSize)).first->second;
       auto points = ir.GetPoints();
       int col = 0;
       // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task

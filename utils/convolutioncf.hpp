@@ -4,6 +4,8 @@
 #include <comp.hpp>
 #include <python_ngstd.hpp>
 
+#include <shared_mutex>
+
 namespace ngfem
 {
 
@@ -21,7 +23,7 @@ namespace ngfem
     // ASSUMPTION: IntegrationRules given as input of Evaluate() during the lifetime
     // of this ConvolutionCF can be uniquely identified by their Size() and the
     // corresponding element
-    vector<pair<map<int, typename ngbla::Matrix<>>, mutex>> kernelLUT;
+    mutable vector<pair<map<int, typename ngbla::Matrix<>>, shared_timed_mutex>> kernelLUT;
   public:
     ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                                     shared_ptr<CoefficientFunction> ac2,
