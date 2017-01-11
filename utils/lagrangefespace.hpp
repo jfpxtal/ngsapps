@@ -10,7 +10,7 @@ namespace ngcomp
   class LagrangeFESpace : public FESpace
   {
     int order;
-    int ndof;
+    size_t ndof;
 
     Array<int> first_edge_dof;
     Array<int> first_face_dof;
@@ -26,10 +26,9 @@ namespace ngcomp
     }
 
     virtual void Update(LocalHeap & lh) override;
-    virtual int GetNDof() const throw() override { return ndof; }
+    virtual size_t GetNDof() const throw() override { return ndof; }
 
-    virtual void GetDofNrs(int elnr, Array<int> & dnums) const override;
-    virtual void GetSDofNrs(int selnr, Array<int> & dnums) const override;
+    virtual void GetDofNrs(ElementId, Array<int> & dnums) const override;
 
     virtual const FiniteElement & GetFE(int elnr, LocalHeap & lh) const override;
     virtual const FiniteElement & GetSFE(int selnr, LocalHeap & lh) const override;
