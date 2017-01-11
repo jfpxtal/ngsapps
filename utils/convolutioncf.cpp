@@ -9,12 +9,13 @@ namespace ngfem
                               shared_ptr<ngcomp::MeshAccess> ama, int aorder)
   : CoefficientFunction(ac1->Dimension(), ac1->IsComplex()),
     c1(ac1), c2(ac2), ma(ama), order(aorder),
-    kernelLUT(ma->GetNE()), totalConvIRSize(0)
+    kernelLUT(ma->GetNE()), totalConvIRSize(0), SIMD_kernelLUT(ma->GetNE()), SIMD_totalConvIRSize(0)
   {
     // TODO: switch to FESpace as argument, use FESpace->Elements
     for (auto &&el : ma->Elements())
     {
       totalConvIRSize += IntegrationRule(el.GetType(), order).Size();
+      SIMD_totalConvIRSize += SIMD_IntegrationRule(el.GetType(), order).Size()*SIMD<IntegrationPoint>::Size();
     }
   }
 
@@ -92,6 +93,7 @@ namespace ngfem
     {
       readLock.unlock();
       unique_lock<shared_timed_mutex> writeLock(lutElEntry.second);
+      //cout << ir.IR() << endl << endl;
 
       // cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
       auto &mat = irSizeMap.emplace(ir.Size(), Matrix<>(ir.Size(), totalConvIRSize)).first->second;
@@ -115,7 +117,7 @@ namespace ngfem
 
         for (auto j : Range(ir.Size()))
         {
-          for (auto k : Range(convMIR.Size()))
+          for (auto k : Range(convIR.Size()))
           {
             FlatVector<double> newpt = points.Row(j) - mirpts.Row(k) | lh;
             // dummy MIP doesn't have the correct ElementTransformation
@@ -137,12 +139,150 @@ namespace ngfem
         ElementId ei(VOL, i);
         auto & trafo = ma->GetTrafo (ei, lh);
         IntegrationRule convIR(trafo.GetElementType(), order);
-        BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
+        auto & convMIR = trafo(convIR, lh);
         FlatMatrix<> vals1(convIR.Size(), 1, lh);
 
         c1->Evaluate(convMIR, vals1);
         values += it->second.Cols(col, col+convIR.Size()) * vals1;
         col += convIR.Size();
+      }
+    }
+  }
+
+  void PrintBare(const ABareMatrix<double> &mat, int h, int w)
+  {
+    cout << "Bare " << h << " " << w << endl;
+    for (int i = 0; i < h; i++) {
+      for (int j = 0; j < w; j++)
+        cout << " " << mat.Get(i, j);
+      cout << endl;
+    }
+    cout << endl << endl;
+  }
+
+  void ConvolutionCoefficientFunction :: Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
+  {
+    // TODO: test test test
+    //cout << "                SIMD !!!!!!!!!!!!!!!" << endl << endl;
+    auto lh = LocalHeap(100000, "convolutioncf lh", true);
+    values.AddSize(Dimension(), ir.Size()) = 0;
+
+    auto &lutElEntry = SIMD_kernelLUT[ir.GetTransformation().GetElementNr()];
+    auto &irSizeMap = lutElEntry.first;
+    shared_lock<shared_timed_mutex> readLock(lutElEntry.second);
+    auto it = irSizeMap.find(ir.Size());
+    if (it == irSizeMap.end())
+    //if (1)
+    {
+      readLock.unlock();
+      unique_lock<shared_timed_mutex> writeLock(lutElEntry.second);
+      //cout << ir.IR() << endl << endl;
+      //cout << ir << endl << endl;
+
+      // cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
+      auto &mat = irSizeMap.emplace(ir.Size(), Matrix<SIMD<double>>(SIMD_totalConvIRSize, ir.Size())).first->second;
+      auto points = ir.GetPoints();
+      int row = 0;
+      // ma->IterateElements doesn't work if Evaluate was called inside a TaskManager task
+      // because TaskManager gets stuck on nested tasks
+      for (auto i : Range(ma->GetNE()))
+      {
+        //cout << "element " << i << endl << endl;
+        HeapReset hr(lh);
+        ElementId ei(VOL, i);
+        auto & trafo = ma->GetTrafo (ei, lh);
+
+        SIMD_IntegrationRule convIR(trafo.GetElementType(), order);
+        //cout << "convIR " << convIR << endl << endl;
+        auto & convMIR = trafo(convIR, lh);
+        //cout << "convMIR " << convMIR << endl << endl;
+        FlatMatrix<SIMD<double>> vals1(1, convIR.Size(), lh);
+
+        c1->Evaluate (convMIR, vals1);
+        //cout << "vals1 " << vals1 << endl << endl;
+
+        auto mirpts = convMIR.GetPoints();
+        //cout << "points" << endl;
+        //PrintBare(points, ir.Size(), 2);
+        //cout << "mirpts" << endl;
+        //PrintBare(mirpts, convMIR.Size(), 2);
+
+        size_t newSize = ir.Size()*convIR.Size()*SIMD<IntegrationPoint>::Size();
+        FlatArray<SIMD<IntegrationPoint>> newIPs(newSize, lh);
+        // dummy MIP doesn't have the correct ElementTransformation
+        // but it doesn't matter as long as c2 only uses the actual points, not the trafo
+        // should be ok for most convolution kernels
+        SIMD_BaseMappedIntegrationRule *newBMIR;
+        switch (ir.DimSpace())
+        {
+        case 1:
+          newBMIR = new (lh) SIMD_MappedIntegrationRule<0, 1>(SIMD_IntegrationRule(newSize, &newIPs[0]), DummyElementTransformation(1), -1, lh);
+          break;
+        case 2:
+          newBMIR = new (lh) SIMD_MappedIntegrationRule<0, 2>(SIMD_IntegrationRule(newSize, &newIPs[0]), DummyElementTransformation(2), -1, lh);
+          break;
+        case 3:
+          newBMIR = new (lh) SIMD_MappedIntegrationRule<0, 3>(SIMD_IntegrationRule(newSize, &newIPs[0]), DummyElementTransformation(3), -1, lh);
+          break;
+        }
+
+        for (auto j : Range(convIR.Size()))
+        {
+          for (auto m : Range(SIMD<IntegrationPoint>::Size()))
+          {
+            for (auto k : Range(ir.Size()))
+            {
+              for (auto l : Range(ir.DimSpace()))
+                newBMIR->GetPoints().Get(j*SIMD<IntegrationPoint>::Size()*ir.Size()+m*ir.Size()+k, l) = points.Get(k, l) - mirpts.Get(j, l)[m];
+            }
+          }
+        }
+
+        //cout << "newBMIR " << *newBMIR << endl << endl;
+        c2->Evaluate(*newBMIR, mat.Rows(row, row+SIMD<IntegrationPoint>::Size()*convIR.Size()));
+        //cout << "vals 2 " << endl << mat.Rows(row, SIMD<IntegrationPoint>::Size()*row+convIR.Size()) << endl << endl;
+        //cout << "weights" << endl;
+        for (auto j : Range(convIR.Size()))
+        {
+          for (auto m : Range(SIMD<IntegrationPoint>::Size()))
+          {
+            mat.Row(row+j*SIMD<IntegrationPoint>::Size()+m) *= convMIR[j].GetWeight()[m];
+            for (auto k : Range(ir.Size()))
+                values(0, k) += vals1(j)[m] * mat(row+j*SIMD<IntegrationPoint>::Size()+m, k);
+          }
+          // cout << k << ": " << convMIR[k].GetMeasure() << " " << convMIR[k].IP().Weight() << " " << "w " <<  convMIR[k].GetWeight() << endl;
+        }
+        //cout << endl << endl;
+        //cout << mat.Rows(row, row+SIMD<IntegrationPoint>::Size()*convIR.Size()) << endl << endl;
+
+        // values.AddSize(Dimension(), ir.Size()) += vals1 * mat.Rows(row, row+SIMD<IntegrationPoint>::Size()*convIR.Size());
+        //cout << values.AddSize(Dimension(), ir.Size()) << endl << endl;
+
+        row += SIMD<IntegrationPoint>::Size()*convIR.Size();
+      }
+
+    } else {
+      int row = 0;
+      for (auto i : Range(ma->GetNE()))
+      {
+        HeapReset hr(lh);
+        ElementId ei(VOL, i);
+        auto & trafo = ma->GetTrafo (ei, lh);
+        SIMD_IntegrationRule convIR(trafo.GetElementType(), order);
+        auto & convMIR = trafo(convIR, lh);
+        FlatMatrix<SIMD<double>> vals1(1, convIR.Size(), lh);
+
+        c1->Evaluate(convMIR, vals1);
+
+        for (auto j : Range(convIR.Size()))
+        {
+          for (auto m : Range(SIMD<IntegrationPoint>::Size()))
+          {
+            for (auto k : Range(ir.Size()))
+                values(0, k) += vals1(j)[m] * it->second(row+j*SIMD<IntegrationPoint>::Size()+m, k);
+          }
+        }
+        row += SIMD<IntegrationPoint>::Size()*convIR.Size();
       }
     }
   }

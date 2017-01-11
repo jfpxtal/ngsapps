@@ -57,8 +57,13 @@ r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
 b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
 
 # convolution
-convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
-convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
+thin = 200
+k0 = 20
+K = k0*exp(-thin*(x*x+y*y))
+# convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
+# convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
+convr = Convolve(r2, K, mesh, convOrder)
+convb = Convolve(b2, K, mesh, convOrder)
 
 # GridFunctions for caching of convolution values and automatic gradient calculation
 grid = GridFunction(fes)

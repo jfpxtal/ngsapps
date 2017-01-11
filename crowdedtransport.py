@@ -101,8 +101,7 @@ rho2.Set(CoefficientFunction(0.5))
 # and caches to prevent unnecessary calculation in aconv.Assemble()
 # convx = Convolve(rho2, Kdx, mesh, conv_order)
 # convy = Convolve(rho2, Kdy, mesh, conv_order)
-conv = Convolve(rho2, GaussKernel(scal=5, var=200), mesh, conv_order)
-# conv = Convolve(rho2, K, mesh, conv_order)
+conv = Convolve(rho2, K, mesh, conv_order)
 # convx = Convolve(grad(rho2)[0], K, mesh, conv_order)
 # convy = Convolve(grad(rho2)[1], K, mesh, conv_order)
 # convx_cache = Cache(convx, fes)
@@ -171,6 +170,7 @@ f.Assemble()
 rhs = rho2.vec.CreateVector()
 mstar = asip.mat.CreateMatrix()
 
+Draw(g, mesh, 'conv')
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
@@ -192,11 +192,11 @@ with TaskManager():
         print("\nt = {:10.6e}".format(t))
         t += tau
 
-        print('Assembling aupw...')
+        # print('Assembling aupw...')
         aupw.Assemble()
-        print('Calculating convolution integrals...')
+        # print('Calculating convolution integrals...')
         g.Set(conv)
-        print('Assembling aconv...')
+        # print('Assembling aconv...')
         aconv.Assemble()
 
         rhs.data = m.mat * rho2.vec
