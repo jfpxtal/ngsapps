@@ -54,7 +54,7 @@ void LagrangeSegm::T_CalcShape (const T &x, BareSliceVector<T> shape) const
   // inner dofs
   for (int i = 1; i < order; ++i)
   {
-    shape[ii++] = T_LagrangeBasis1D(i, x);
+    shape[ii++] = T_LagrangeBasis1D(order - i, x);
   }
 }
 

@@ -13,21 +13,21 @@ LagrangeFESpace::LagrangeFESpace(shared_ptr<MeshAccess> ama, const Flags &flags)
   // needed to draw solution function
   if (ama->GetDimension() == 2)
   {
-    evaluator = make_shared<T_DifferentialOperator<DiffOpId<2>>>();
-    flux_evaluator = make_shared<T_DifferentialOperator<DiffOpGradient<2>>>();
-    boundary_evaluator = make_shared<T_DifferentialOperator<DiffOpIdBoundary<2>>>();
-    boundary_flux_evaluator = make_shared<T_DifferentialOperator<DiffOpGradientBoundary<2>>>();
+    evaluator[VOL] = make_shared<T_DifferentialOperator<DiffOpId<2>>>();
+    flux_evaluator[VOL] = make_shared<T_DifferentialOperator<DiffOpGradient<2>>>();
+    evaluator[BND] = make_shared<T_DifferentialOperator<DiffOpIdBoundary<2>>>();
+    flux_evaluator[BND] = make_shared<T_DifferentialOperator<DiffOpGradientBoundary<2>>>();
   }
   else
   {
-    evaluator = make_shared<T_DifferentialOperator<DiffOpId<3>>>();
-    flux_evaluator = make_shared<T_DifferentialOperator<DiffOpGradient<3>>>();
-    boundary_evaluator = make_shared<T_DifferentialOperator<DiffOpIdBoundary<3>>>();
-    boundary_flux_evaluator = make_shared<T_DifferentialOperator<DiffOpGradientBoundary<3>>>();
+    evaluator[VOL] = make_shared<T_DifferentialOperator<DiffOpId<3>>>();
+    flux_evaluator[VOL] = make_shared<T_DifferentialOperator<DiffOpGradient<3>>>();
+    evaluator[BND] = make_shared<T_DifferentialOperator<DiffOpIdBoundary<3>>>();
+    flux_evaluator[BND] = make_shared<T_DifferentialOperator<DiffOpGradientBoundary<3>>>();
   }
-  integrator = GetIntegrators().CreateBFI("mass", ma->GetDimension(),
+  integrator[VOL] = GetIntegrators().CreateBFI("mass", ma->GetDimension(),
                                           make_shared<ConstantCoefficientFunction>(1));
-  boundary_integrator = CreateBFI("robin", ma->GetDimension(), 
+  integrator[BND] = CreateBFI("robin", ma->GetDimension(), 
                                   make_shared<ConstantCoefficientFunction>(1));
 }
 
@@ -71,20 +71,22 @@ void LagrangeFESpace::Update(LocalHeap & h)
   ndof = ii;
 }
 
-void LagrangeFESpace::GetDofNrs(int elnr, Array<int> &dnums) const
+void LagrangeFESpace::GetDofNrs(ElementId ei, Array<int> &dnums) const
 {
-  // returns dofs of element number elnr
+  if (ei.VB() == VOL)
+  {
+    // returns dofs of element number elnr
 
-  dnums.SetSize(0);
+    dnums.SetSize(0);
 
-  Ngs_Element ngel = ma->GetElement (elnr);
+    Ngs_Element ngel = ma->GetElement (ei.Nr());
 
-  // vertex dofs
-  for (int i = 0; i < ma->GetDimension() + 1; i++)
-    dnums.Append (ngel.vertices[i]);
+    // vertex dofs
+    for (int i = 0; i < ma->GetDimension() + 1; i++)
+      dnums.Append (ngel.vertices[i]);
 
-  // edge dofs
-  for (int i = 0; i < (ma->GetDimension() == 3 ? 6 : 3); i++)
+    // edge dofs
+    for (int i = 0; i < (ma->GetDimension() == 3 ? 6 : 3); i++)
     {
       int first = first_edge_dof[ngel.edges[i]];
       int next  = first_edge_dof[ngel.edges[i]+1];
@@ -92,55 +94,53 @@ void LagrangeFESpace::GetDofNrs(int elnr, Array<int> &dnums) const
         dnums.Append (j);
     }
 
-  // face dofs
-  if (ma->GetDimension() == 3)
-  for (int i = 0; i < 4; i++)
-  {
-    int fi = (ma->GetDimension() == 3 ? ngel.faces[i] : elnr);
-    int first = first_face_dof[fi];
-    int next  = first_face_dof[fi+1];
-    for (int j = first; j < next; j++)
-      dnums.Append (j);
-  }
-
-  int first = first_cell_dof[elnr];
-  int next  = first_cell_dof[elnr+1];
-  for (int j = first; j < next; j++)
-    dnums.Append (j);
-  // cout << "dnums = " << dnums << endl;
-}
-
-
-void LagrangeFESpace::GetSDofNrs(int elnr, Array<int> &dnums) const
-{
-  // the same for the surface elements
-
-  dnums.SetSize(0);
-
-  Ngs_Element ngel = ma->GetSElement (elnr);
-
-  // vertex dofs
-  for (int i = 0; i < ma->GetDimension(); i++)
-    dnums.Append (ngel.vertices[i]);
-
-  for (int i = 0; i < (ma->GetDimension() == 3 ? 3 : 1); ++i)
-  {
-    // edge dofs
-    int first = first_edge_dof[ngel.edges[i]];
-    int next  = first_edge_dof[ngel.edges[i]+1];
-    for (int j = first; j < next; j++)
-      dnums.Append (j);
-  }
-
-  if (ma->GetDimension() == 3)
-  {
     // face dofs
-    int first = first_face_dof[ngel.faces[0]];
-    int next  = first_face_dof[ngel.faces[0]+1];
+    if (ma->GetDimension() == 3)
+      for (int i = 0; i < 4; i++)
+      {
+        int fi = (ma->GetDimension() == 3 ? ngel.faces[i] : ei.Nr());
+        int first = first_face_dof[fi];
+        int next  = first_face_dof[fi+1];
+        for (int j = first; j < next; j++)
+          dnums.Append (j);
+      }
+
+    int first = first_cell_dof[ei.Nr()];
+    int next  = first_cell_dof[ei.Nr()+1];
     for (int j = first; j < next; j++)
       dnums.Append (j);
+    // cout << "dnums = " << dnums << endl;
+  }
+  else
+  {
+    dnums.SetSize(0);
+
+    Ngs_Element ngel = ma->GetSElement (ei.Nr());
+
+    // vertex dofs
+    for (int i = 0; i < ma->GetDimension(); i++)
+      dnums.Append (ngel.vertices[i]);
+
+    for (int i = 0; i < (ma->GetDimension() == 3 ? 3 : 1); ++i)
+    {
+      // edge dofs
+      int first = first_edge_dof[ngel.edges[i]];
+      int next  = first_edge_dof[ngel.edges[i]+1];
+      for (int j = first; j < next; j++)
+        dnums.Append (j);
+    }
+
+    if (ma->GetDimension() == 3)
+    {
+      // face dofs
+      int first = first_face_dof[ngel.faces[0]];
+      int next  = first_face_dof[ngel.faces[0]+1];
+      for (int j = first; j < next; j++)
+        dnums.Append (j);
+    }
   }
 }
+
 
 
 // returns the reference element
