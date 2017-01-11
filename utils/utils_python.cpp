@@ -6,6 +6,7 @@
 #include "composecf.hpp"
 #include "convolutioncf.hpp"
 #include "cachecf.hpp"
+#include "zlogzcf.hpp"
 
 using namespace ngfem;
 
@@ -28,6 +29,37 @@ void ExportNgsAppsUtils(py::module &m)
               new (instance) PyRCF(make_shared<RandomCoefficientFunction> (lower, upper));
             },
           py::arg("lower")=0.0, py::arg("upper")=1.0
+      );
+
+  // typedef PyWrapperDerived<LambdaCoefficientFunction,CoefficientFunction> PyLambdaCF;
+  // py::class_<PyLambdaCF, PyCF>(m, "LambdaCF");//.def(py::init<>());
+  typedef PyWrapperDerived<GaussKernel,CoefficientFunction> PyGaussCF;
+  py::class_<PyGaussCF, PyCF>
+    (m, "GaussKernel")
+    .def("__init__",
+         [](PyGaussCF *instance, double scal, double var)
+         {
+           new (instance) PyGaussCF(make_shared<GaussKernel> (scal, var));
+         },
+         py::arg("scal")=1.0, py::arg("var")=1.0)
+    .def("Dx", [](PyGaussCF & self)
+         {
+           return PyCF(self->Dx());
+         })
+    .def("Dy", [](PyGaussCF & self)
+         {
+           return PyCF(self->Dy());
+         })
+       ;
+
+  typedef PyWrapperDerived<ZLogZCoefficientFunction,CoefficientFunction> PyZLogZ;
+  py::class_<PyZLogZ, PyCF>
+    (m, "ZLogZCF")
+    .def("__init__",
+         [](PyZLogZ *instance, py::object cf)
+         {
+           new (instance) PyZLogZ(make_shared<ZLogZCoefficientFunction>(MakeCoefficient(cf).Get()));
+         }
       );
 
   typedef PyWrapperDerived<ComposeCoefficientFunction, CoefficientFunction> PyComposeCF;
@@ -70,22 +102,22 @@ void ExportNgsAppsUtils(py::module &m)
 
   typedef PyWrapperDerived<CacheCoefficientFunction, CoefficientFunction> PyCacheCF;
   py::class_<PyCacheCF,PyCF>
-    (m, "Cache", "cache results of a coefficient function in all integration points needed by a symbolic  integrator")
+    (m, "Cache", "cache results of a coefficient function")
     .def ("__init__",
-          [] (PyCacheCF *instance, py::object c, PyFES fes)
+          [] (PyCacheCF *instance, py::object c, shared_ptr<ngcomp::MeshAccess> ma)
           {
-            new (instance) PyCacheCF(make_shared<CacheCoefficientFunction>(MakeCoefficient(c).Get(), fes.Get()));
+            new (instance) PyCacheCF(make_shared<CacheCoefficientFunction>(MakeCoefficient(c).Get(), ma));
           },
-          py::arg("cf"), py::arg("fespace")
+          py::arg("cf"), py::arg("mesh")
       )
-    .def("SetBFI", FunctionPointer([](PyCacheCF & self, PySymBFI bfi)
-      {
-        self->SetBFI(bfi.Get());
-      }))
-    .def("Refresh", FunctionPointer([](PyCacheCF & self)
-      {
-        self->Refresh();
-      }))
+    .def("Invalidate", [](PyCacheCF & self)
+          {
+            self->Invalidate();
+          })
+    .def("Refresh", [](PyCacheCF & self)
+         {
+           self->Refresh();
+         })
     ;
 
   using namespace ngcomp;

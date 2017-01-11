@@ -5,20 +5,23 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   composecf.hpp composecf.cpp
   convolutioncf.hpp convolutioncf.cpp
   cachecf.hpp cachecf.cpp
+  zlogzcf.hpp zlogzcf.cpp
+  utils.hpp utils.cpp
   )
+
 
 set_target_properties(ngsapps_utils PROPERTIES SUFFIX ".so")
 
 if(NOT WIN32)
+  message(STATUS ${NETGEN_LIBS})
     target_link_libraries(ngsapps_utils ${PYTHON_LIBS} ${LAPACK_LIBRARIES} ${NETGEN_LIBS})
   install( TARGETS ngsapps_utils ${ngs_install_dir})
 endif(NOT WIN32)
 
 if(USE_PYTHON)
     install (FILES
-            utils.py 
+            utils.py
             DESTINATION ${PYTHON_PACKAGES_INSTALL_DIR}/ngsapps
             COMPONENT ngsapps
             )
 endif(USE_PYTHON)
-
