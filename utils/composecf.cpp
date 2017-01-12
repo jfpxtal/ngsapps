@@ -7,7 +7,14 @@ namespace ngfem
                               shared_ptr<ngcomp::MeshAccess> ama)
   : CoefficientFunction(ac2->Dimension(), ac2->IsComplex()),
       c1(ac1), c2(ac2), ma(ama)
-  {}
+  {
+    // force mesh to build search tree to speed up later calls to FindElementOfPoint
+    // can't call FindElementOfPoint with build_searchtree=true inside Evaluate
+    // because Evaluate might get called from functions like VisualSceneSolution::DrawScene
+    // which lock the mesh mutex and cause BuidSearchTree to get stuck
+    IntegrationPoint dummy;
+    ma->FindElementOfPoint(Vector<>({0, 0, 0}), dummy, true);
+  }
 
   ComposeCoefficientFunction::~ComposeCoefficientFunction ()
   {}
