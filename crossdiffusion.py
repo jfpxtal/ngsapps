@@ -195,3 +195,8 @@ with TaskManager():
         ax.autoscale_view()
         fig.canvas.draw()
         # input()
+
+for item in ents:
+        outfile.write("%s\n" % item)
+outfile.close()
+
