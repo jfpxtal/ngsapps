@@ -21,8 +21,8 @@ Vr = x
 Vb = -x
 
 # time step and end
-tau = 0.01
-tend = -1
+tau = 0.05
+tend = 25
 
 # jump penalty
 eta = 100
@@ -69,14 +69,10 @@ convb = Convolve(b2, K, mesh, convOrder)
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(Vr+convr, definedon=topMat)
-gridb.Set(Vb+convb, definedon=topMat)
+gridr.Set(0*(Vr+convr), definedon=topMat)
+gridb.Set(0*(Vb+convb), definedon=topMat)
 velocityr = (1-r2-b2)*grad(gridr)
 velocityb = (1-r2-b2)*grad(gridb)
-
-# special values for DG
-n = specialcf.normal(mesh.dim)
-h = specialcf.mesh_size
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -159,8 +155,14 @@ mstar = m.mat.CreateMatrix()
 both = r2 + Compose((x, y+1.3), b2, mesh)
 Draw(both, mesh, 'both')
 
+# Calculate constant equilibria
+domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
+rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
+binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
+
+
 times = [0.0]
-entropy = ZLogZCF(r2) + ZLogZCF(b2) + ZLogZCF(1-r2-b2) + r2*gridr + b2*gridb
+entropy = ZLogZCF(r2/rinfty) + ZLogZCF(b2/binfty) + ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
@@ -175,8 +177,8 @@ with TaskManager():
         t += tau
 
         print('Calculating convolution integrals...')
-        gridr.Set(Vr+convr, definedon=topMat)
-        gridb.Set(Vb+convb, definedon=topMat)
+#        gridr.Set(Vr+convr, definedon=topMat)
+#        gridb.Set(Vb+convb, definedon=topMat)
         print('Assembling a...')
         a.Assemble()
 
@@ -186,16 +188,17 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         s.vec.data = invmat * rhs
 
-        Redraw(blocking=False)
+#        Redraw(blocking=False)
         times.append(t)
         ents.append(Integrate(entropy, mesh, definedon=topMat))
         line.set_xdata(times)
         line.set_ydata(ents)
         ax.relim()
         ax.autoscale_view()
-        fig.canvas.draw()
+ #       fig.canvas.draw()
         # input()
 
+outfile = open('ents_dg.csv','w')
 for item in ents:
         outfile.write("%s\n" % item)
 outfile.close()
