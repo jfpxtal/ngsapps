@@ -2,6 +2,7 @@ from netgen.geom2d import SplineGeometry
 from ngsolve import *
 import matplotlib.pyplot as plt
 from ngsapps.utils import *
+import numpy as np
 
 order = 3
 maxh = 0.15
@@ -55,22 +56,24 @@ b2 = s.components[1]
 # b2.Set(IfPos(x-1.8, 0.6, 0), definedon=topMat)
 r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
 b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
+#r2.Set(0.5+0*x, definedon=topMat)
+#b2.Set(0.5+0*x, definedon=topMat)
 
 # convolution
 thin = 200
 k0 = 20
 K = k0*exp(-thin*(x*x+y*y))
-# convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
-# convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
-convr = Convolve(r2, K, mesh, convOrder)
-convb = Convolve(b2, K, mesh, convOrder)
+convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
+convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
+#convr = Convolve(r2, K, mesh, convOrder)
+#convb = Convolve(b2, K, mesh, convOrder)
 
 # GridFunctions for caching of convolution values and automatic gradient calculation
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(0*(Vr+convr), definedon=topMat)
-gridb.Set(0*(Vb+convb), definedon=topMat)
+gridr.Set(Vr+0*convr, definedon=topMat)
+gridb.Set(Vb+0*convb, definedon=topMat)
 velocityr = (1-r2-b2)*grad(gridr)
 velocityb = (1-r2-b2)*grad(gridb)
 
@@ -145,20 +148,71 @@ m += SymbolicBFI(b*tb)
 print('Assembling m...')
 m.Assemble()
 
+# Calculate constant equilibria
+domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
+mr = Integrate(r2,mesh, definedon=topMat)
+mb = Integrate(b2,mesh, definedon=topMat)
+
+rbinfty = GridFunction(fes)
+rinfty = rbinfty.components[0]
+binfty = rbinfty.components[1]
+
+#rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
+#binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
+
+#### TODO: Add diffusion coeffs
+
+# Newton Solver to determine stationary solutions
+def AApply(uv,V,W,mesh):
+    mmr = Integrate( exp(uv[0]-V) / (1+exp(uv[0]-V)+exp(uv[1]-W)), mesh )
+    mmb = Integrate( exp(uv[1]-W) / (1+exp(uv[0]-V)+exp(uv[1]-W)), mesh )
+    #w = v * (1 - v) * (v - alpha)
+    # print(dt * np.hstack((w, -w)))
+    return (np.hstack((mmr, mmb)))
+
+def AssembleLinearization(uv,V,W,mesh):
+    m = np.empty([2,2])
+    m[0,0] = Integrate(exp(uv[0]-V)/(1+exp(uv[0]-V)+exp(uv[1]-W))*(1-exp(uv[0]-V)/(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
+    m[0,1] = Integrate(-exp(uv[0]-V)*exp(uv[1]-W)/((1+exp(uv[0]-V)+exp(uv[1]-W))*(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
+
+    m[1,0] = Integrate(-exp(uv[0]-V)*exp(uv[1]-W)/((1+exp(uv[0]-V)+exp(uv[1]-W))*(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
+    m[1,1] = Integrate(exp(uv[1]-W)/(1+exp(uv[0]-V)+exp(uv[1]-W))*(1-exp(uv[1]-W)/(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)    
+    
+    # print(dt * Alin.toarray())
+    return m
+
+updnorm = 1e99
+#uinfty = 1
+#vinfty = 1
+uvinfty = np.hstack((1.0,1.0))
+# Newton solver
+while updnorm > 1e-9:
+    rhs = AApply(uvinfty,gridr,gridb,mesh) - np.hstack((mr, mb))
+    Alin = AssembleLinearization(uvinfty,gridr,gridb,mesh)
+#    urgh
+    upd = np.linalg.solve(Alin, rhs)
+    
+    updnorm = np.linalg.norm(upd)
+    print('|w| = {:7.3e} '.format(updnorm),end='\n')
+    uvinfty = uvinfty - 0.01*upd
+    # input('')
+
+
+rinfty.Set(exp(uvinfty[0]-gridr) / (1+exp(uvinfty[0]-gridr)+exp(uvinfty[1]-gridb)))
+binfty.Set(exp(uvinfty[1]-gridb) / (1+exp(uvinfty[0]-gridr)+exp(uvinfty[1]-gridb)))
+
 rhs = s.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
+
 
 # Draw(r2, mesh, 'r')
 # Draw(b2, mesh, 'b')
 # visualize both species at the same time, red in top rectangle, blue in bottom
 # translate density b2 of blue species to bottom rectangle
 both = r2 + Compose((x, y+1.3), b2, mesh)
+both2 = rinfty + Compose((x, y+1.3), binfty, mesh)
 Draw(both, mesh, 'both')
-
-# Calculate constant equilibria
-domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
-rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
-binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
+Draw(both2, mesh, 'stationary')
 
 
 times = [0.0]
@@ -188,7 +242,7 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         s.vec.data = invmat * rhs
 
-#        Redraw(blocking=False)
+        Redraw(blocking=False)
         times.append(t)
         ents.append(Integrate(entropy, mesh, definedon=topMat))
         line.set_xdata(times)
