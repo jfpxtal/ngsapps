@@ -6,6 +6,7 @@ from netgen.geom2d import unit_square
 from ngsolve import *
 import matplotlib.pyplot as plt
 from ngsapps.utils import *
+import numpy as np
 
 order = 3
 maxh = 0.15
@@ -22,6 +23,11 @@ Dr = 0.1
 # blue species
 Db = 0.3
 
+# advection potentials
+# gradVr = CoefficientFunction((1.0, 0.0))
+# gradVb = -gradVr
+Vr = -x
+Vb = x
 
 #mesh = Mesh (unit_square.GenerateMesh(maxh=0.1))
 from netgen.geom2d import SplineGeometry
@@ -54,18 +60,12 @@ r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
 b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
 
 u = GridFunction (fes)
-rhs = u.vec.CreateVector()
-uold = u.vec.CreateVector()
 
-potV = GridFunction(fes1)
-potW = GridFunction(fes1)
-potV.Set(0*x) #CoefficientFunction( (1,0) ))
-#potV = CoefficientFunction( (1,0) ) #y-0.5,0.5-x) )
-#potW = CoefficientFunction( (-1,0) ) #y-0.5,0.5-x) )
-potW.Set(0*x) #CoefficientFunction (-1,0) )
-# the right hand side
-#f = LinearForm (fes)
-#f += Source (32 * (y*(1-y)+x*(1-x)))
+grid = GridFunction(fes)
+gridr = grid.components[0]
+gridb = grid.components[1]
+gridr.Set(Vr, definedon=topMat)
+gridb.Set(Vb, definedon=topMat)
 
 # Flow boundary conditions
 alpha1 = 0.7
@@ -77,10 +77,10 @@ eps = 0.1
 # the bilinear-form
 rho = u.components[0] + u.components[1]
 a = BilinearForm (fes, symmetric=False)
-a += SymbolicBFI ( Dr*(1-b2)*grad(r)*grad(tr) + Dr*r2*grad(b)*grad(tr) + r*(1-r2-b2)*grad(potV)*grad(tr) )
-a += SymbolicBFI ( Db*(1-r2)*grad(b)*grad(tb) + Db*b2*grad(r)*grad(tb) + b*(1-r2-b2)*grad(potW)*grad(tb) )
-#a += SymbolicBFI ( Dr*(1-rho)*grad(r)*grad(tr) + eps*u.components[0]*(grad(r)+grad(b))*grad(tr) + r*(1-rho)*grad(potV)*grad(tr) )
-#a += SymbolicBFI ( Db*(1-rho)*grad(b)*grad(tb) + eps*u.components[1]*(grad(r)+grad(b))*grad(tb) + b*(1-rho)*grad(potW)*grad(tb) )
+a += SymbolicBFI ( Dr*(1-b2)*grad(r)*grad(tr) + Dr*r2*grad(b)*grad(tr) + r*(1-r2-b2)*grad(gridr)*grad(tr) )
+a += SymbolicBFI ( Db*(1-r2)*grad(b)*grad(tb) + Db*b2*grad(r)*grad(tb) + b*(1-r2-b2)*grad(gridb)*grad(tb) )
+#a += SymbolicBFI ( Dr*(1-rho)*grad(r)*grad(tr) + eps*u.components[0]*(grad(r)+grad(b))*grad(tr) + r*(1-rho)*grad(gridr)*grad(tr) )
+#a += SymbolicBFI ( Db*(1-rho)*grad(b)*grad(tb) + eps*u.components[1]*(grad(r)+grad(b))*grad(tb) + b*(1-rho)*grad(gridb)*grad(tb) )
 #a += SymbolicBFI ( alpha1*(r+b)*tr + alpha2*(r+b)*tb,BND,definedon=[1] )
 #a += SymbolicBFI ( beta1*r*tr + beta2*b*tb,BND,definedon=[3] )
 m = BilinearForm(fes)
@@ -93,21 +93,76 @@ f.Assemble()
 m.Assemble()
 mmat = m.mat
 smat = mmat.CreateMatrix()
+
+
+# Calculate constant equilibria
+domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
+mr = Integrate(r2,mesh, definedon=topMat)
+mb = Integrate(b2,mesh, definedon=topMat)
+
+rbinfty = GridFunction(fes)
+rinfty = rbinfty.components[0]
+binfty = rbinfty.components[1]
+
+#rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
+#binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
+
+#### TODO: Add diffusion coeffs
+
+# Newton Solver to determine stationary solutions
+def AApply(uv,V,W,mesh):
+    mmr = Integrate( exp((uv[0]-V)/Dr) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
+    mmb = Integrate( exp((uv[1]-W)/Db) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
+    #w = v * (1 - v) * (v - alpha)
+    # print(dt * np.hstack((w, -w)))
+    return (np.hstack((mmr, mmb)))
+
+def AssembleLinearization(uv,V,W,mesh):
+    m = np.empty([2,2])
+    m[0,0] = Integrate(exp((uv[0]-V)/Dr)*(1+exp((uv[1]-W)/Db))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Dr),mesh,definedon=topMat)
+    m[0,1] = Integrate(-1/Db*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
+
+    m[1,0] = Integrate(-1/Dr*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
+    m[1,1] = Integrate(exp((uv[1]-W)/Db)*(1+exp((uv[0]-V)/Dr))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Db),mesh,definedon=topMat)
+    
+    # print(dt * Alin.toarray())
+    return m
+
+updnorm = 1e99
+#uinfty = 1
+#vinfty = 1
+uvinfty = np.hstack((0.0,0.0))
+# Newton solver
+while updnorm > 1e-9:
+    rhs = AApply(uvinfty,Vr,Vb,mesh) - np.hstack((mr, mb))
+    Alin = AssembleLinearization(uvinfty,Vr,Vb,mesh)
+#    urgh
+    upd = np.linalg.solve(Alin, rhs)
+    
+    updnorm = np.linalg.norm(upd)
+    
+    uvinfty = uvinfty - 0.1*upd
+    # input('')
+
+print('Newton converged with error' + '|w| = {:7.3e} '.format(updnorm),end='\n')
+rinfty.Set(exp((uvinfty[0]-gridr)/Dr) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
+binfty.Set(exp((uvinfty[1]-gridb)/Db) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
+
 #f.Assemble()
 #pi = 3.14159
+rhs = u.vec.CreateVector()
+uold = u.vec.CreateVector()
+
 
 # visualize both species at the same time, red in top rectangle, blue in bottom
 # translate density b2 of blue species to bottom rectangle
 both = r2 + Compose((x, y+1.3), b2, mesh)
+both2 = rinfty + Compose((x, y+1.3), binfty, mesh)
 Draw(both, mesh, 'both')
-
-# Calculate constant equilibria
-domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
-rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
-binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
+Draw(both2, mesh, 'stationary')
 
 times = [0.0]
-entropy = ZLogZCF(r2/rinfty) + ZLogZCF(b2/binfty) + ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*potV + b2*potW
+entropy = ZLogZCF(r2/rinfty) + ZLogZCF(b2/binfty) + ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)

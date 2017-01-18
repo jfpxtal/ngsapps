@@ -18,15 +18,15 @@ Db = 0.3
 # advection potentials
 # gradVr = CoefficientFunction((1.0, 0.0))
 # gradVb = -gradVr
-Vr = x
-Vb = -x
+Vr = -x
+Vb = x
 
 # time step and end
 tau = 0.05
 tend = 25
 
 # jump penalty
-eta = 100
+eta = 50
 
 # geometry and mesh
 geo = SplineGeometry()
@@ -74,8 +74,8 @@ gridr = grid.components[0]
 gridb = grid.components[1]
 gridr.Set(Vr+0*convr, definedon=topMat)
 gridb.Set(Vb+0*convb, definedon=topMat)
-velocityr = (1-r2-b2)*grad(gridr)
-velocityb = (1-r2-b2)*grad(gridb)
+velocityr = -(1-r2-b2)*grad(gridr)
+velocityb = -(1-r2-b2)*grad(gridb)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -164,19 +164,19 @@ binfty = rbinfty.components[1]
 
 # Newton Solver to determine stationary solutions
 def AApply(uv,V,W,mesh):
-    mmr = Integrate( exp(uv[0]-V) / (1+exp(uv[0]-V)+exp(uv[1]-W)), mesh )
-    mmb = Integrate( exp(uv[1]-W) / (1+exp(uv[0]-V)+exp(uv[1]-W)), mesh )
+    mmr = Integrate( exp((uv[0]-V)/Dr) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
+    mmb = Integrate( exp((uv[1]-W)/Db) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
     #w = v * (1 - v) * (v - alpha)
     # print(dt * np.hstack((w, -w)))
     return (np.hstack((mmr, mmb)))
 
 def AssembleLinearization(uv,V,W,mesh):
     m = np.empty([2,2])
-    m[0,0] = Integrate(exp(uv[0]-V)/(1+exp(uv[0]-V)+exp(uv[1]-W))*(1-exp(uv[0]-V)/(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
-    m[0,1] = Integrate(-exp(uv[0]-V)*exp(uv[1]-W)/((1+exp(uv[0]-V)+exp(uv[1]-W))*(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
+    m[0,0] = Integrate(exp((uv[0]-V)/Dr)*(1+exp((uv[1]-W)/Db))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Dr),mesh,definedon=topMat)
+    m[0,1] = Integrate(-1/Db*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
 
-    m[1,0] = Integrate(-exp(uv[0]-V)*exp(uv[1]-W)/((1+exp(uv[0]-V)+exp(uv[1]-W))*(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)
-    m[1,1] = Integrate(exp(uv[1]-W)/(1+exp(uv[0]-V)+exp(uv[1]-W))*(1-exp(uv[1]-W)/(1+exp(uv[0]-V)+exp(uv[1]-W))),mesh)    
+    m[1,0] = Integrate(-1/Dr*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
+    m[1,1] = Integrate(exp((uv[1]-W)/Db)*(1+exp((uv[0]-V)/Dr))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Db),mesh,definedon=topMat)
     
     # print(dt * Alin.toarray())
     return m
@@ -184,22 +184,22 @@ def AssembleLinearization(uv,V,W,mesh):
 updnorm = 1e99
 #uinfty = 1
 #vinfty = 1
-uvinfty = np.hstack((1.0,1.0))
+uvinfty = np.hstack((0.0,0.0))
 # Newton solver
 while updnorm > 1e-9:
-    rhs = AApply(uvinfty,gridr,gridb,mesh) - np.hstack((mr, mb))
-    Alin = AssembleLinearization(uvinfty,gridr,gridb,mesh)
+    rhs = AApply(uvinfty,Vr,Vb,mesh) - np.hstack((mr, mb))
+    Alin = AssembleLinearization(uvinfty,Vr,Vb,mesh)
 #    urgh
     upd = np.linalg.solve(Alin, rhs)
     
     updnorm = np.linalg.norm(upd)
-    print('|w| = {:7.3e} '.format(updnorm),end='\n')
-    uvinfty = uvinfty - 0.01*upd
+    
+    uvinfty = uvinfty - 0.1*upd
     # input('')
 
-
-rinfty.Set(exp(uvinfty[0]-gridr) / (1+exp(uvinfty[0]-gridr)+exp(uvinfty[1]-gridb)))
-binfty.Set(exp(uvinfty[1]-gridb) / (1+exp(uvinfty[0]-gridr)+exp(uvinfty[1]-gridb)))
+print('Newton converged with error' + '|w| = {:7.3e} '.format(updnorm),end='\n')
+rinfty.Set(exp((uvinfty[0]-gridr)/Dr) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
+binfty.Set(exp((uvinfty[1]-gridb)/Db) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
 
 rhs = s.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
