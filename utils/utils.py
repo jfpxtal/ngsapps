@@ -54,3 +54,11 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
                                pnums[i + 1 + M * (N + 1)]], index=3))
 
     return netmesh
+
+class ConvolutionCache:
+    def __init__(self, conv):
+        self.conv = conv
+    def __enter__(self):
+        self.conv.CacheCF()
+    def __exit__(self, t, v, trace):
+        self.conv.ClearCFCache()

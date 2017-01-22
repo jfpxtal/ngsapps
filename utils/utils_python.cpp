@@ -86,6 +86,10 @@ void ExportNgsAppsUtils(py::module &m)
        {
          self->CacheCF();
        })
+  .def("ClearCFCache", [](PyConvolveCF & self)
+        {
+          self->ClearCFCache();
+        })
     ;
 
   typedef PyWrapperDerived<SymbolicBilinearFormIntegrator, BilinearFormIntegrator> PySymBFI;

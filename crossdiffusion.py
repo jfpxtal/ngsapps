@@ -229,10 +229,9 @@ with TaskManager():
         t += tau
 
         # print('Calculating convolution integrals...')
-        # convr.CacheCF()
-        # convb.CacheCF()
-        # gridr.Set(Vr+convr)
-        # gridb.Set(Vb+convb)
+        # with ConvolutionCache(convr), ConvolutionCache(convb):
+        #     gridr.Set(Vr+convr)
+        #     gridb.Set(Vb+convb)
         print('Assembling a...')
         a.Assemble()
 

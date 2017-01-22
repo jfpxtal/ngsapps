@@ -43,6 +43,7 @@ namespace ngfem
     virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);
     virtual void PrintReport (ostream & ost) const;
     void CacheCF();
+    void ClearCFCache() { cfLUT.clear(); }
   };
 
   class LambdaCoefficientFunction : public CoefficientFunction

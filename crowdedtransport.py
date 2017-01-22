@@ -195,8 +195,8 @@ with TaskManager():
         # print('Assembling aupw...')
         aupw.Assemble()
         # print('Calculating convolution integrals...')
-        conv.CacheCF()
-        g.Set(conv)
+        with ConvolutionCache(conv):
+            g.Set(conv)
         # print('Assembling aconv...')
         aconv.Assemble()
 

@@ -83,8 +83,8 @@ t = 0.0
 with TaskManager():
     while t < tend:
         print("do convolution")
-        conv.CacheCF()
-        g.Set(conv)
+        with ConvolutionCache(conv):
+            g.Set(conv)
         print("...done\n")
         a.Assemble()
         smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
