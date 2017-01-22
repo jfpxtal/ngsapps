@@ -44,8 +44,8 @@ topMat = mesh.Materials('top')
 
 
 # H1-conforming finite element space
-fes1 = H1(mesh, order=order) # Neumann only, dirichlet=[1,2,3,4])
-fes = FESpace([fes1,fes1])
+fes1 = H1(mesh, order=order, flags={'definedon': ['top']}) # Neumann only, dirichlet=[1,2,3,4])
+fes = FESpace([fes1, fes1], flags={'definedon': ['top']})
 
 r,b = fes.TrialFunction()
 tr,tb = fes.TestFunction()
@@ -54,18 +54,18 @@ tr,tb = fes.TestFunction()
 s = GridFunction(fes)
 r2 = s.components[0]
 b2 = s.components[1]
-# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=topMat)
-# b2.Set(IfPos(x-1.8, 0.6, 0), definedon=topMat)
-r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
-b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
+# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0))
+# b2.Set(IfPos(x-1.8, 0.6, 0))
+r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
+b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 
 u = GridFunction (fes)
 
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(Vr, definedon=topMat)
-gridb.Set(Vb, definedon=topMat)
+gridr.Set(Vr)
+gridb.Set(Vb)
 
 # Flow boundary conditions
 alpha1 = 0.7
@@ -162,7 +162,7 @@ Draw(both, mesh, 'both')
 Draw(both2, mesh, 'stationary')
 
 times = [0.0]
-entropy = ZLogZCF(r2/rinfty) + ZLogZCF(b2/binfty) + ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
+entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)

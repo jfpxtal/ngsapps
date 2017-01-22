@@ -4,11 +4,11 @@
 
 namespace ngfem
 {
-  ConvolutionCoefficientFunction::ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
-                              shared_ptr<CoefficientFunction> ac2,
-                              shared_ptr<ngcomp::MeshAccess> ama, int aorder)
-  : CoefficientFunction(ac1->Dimension(), ac1->IsComplex()),
-    c1(ac1), c2(ac2), ma(ama), order(aorder),
+  ConvolutionCoefficientFunction::ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> acf,
+                                                                  shared_ptr<CoefficientFunction> akernel,
+                                                                  shared_ptr<ngcomp::MeshAccess> ama, int aorder)
+  : CoefficientFunction(acf->Dimension(), acf->IsComplex()),
+    cf(acf), kernel(akernel), ma(ama), order(aorder),
     kernelLUT(ma->GetNE()), totalConvIRSize(0), SIMD_kernelLUT(ma->GetNE()), SIMD_totalConvIRSize(0)
   {
     // TODO: switch to FESpace as argument, use FESpace->Elements
@@ -25,23 +25,23 @@ namespace ngfem
   void ConvolutionCoefficientFunction::PrintReport (ostream & ost) const
   {
     ost << "Convolve(";
-    c1->PrintReport(ost);
+    cf->PrintReport(ost);
     ost << ", ";
-    c2->PrintReport(ost);
+    kernel->PrintReport(ost);
     ost << ")";
   }
 
   void ConvolutionCoefficientFunction::TraverseTree (const function<void(CoefficientFunction&)> & func)
   {
-    c1->TraverseTree (func);
-    c2->TraverseTree (func);
+    cf->TraverseTree (func);
+    kernel->TraverseTree (func);
     func(*this);
   }
 
   double ConvolutionCoefficientFunction::Evaluate (const BaseMappedIntegrationPoint & ip) const
   {
     // TODO: kernelLUT
-    int dim = c1->Dimension();
+    int dim = cf->Dimension();
     auto point = ip.GetPoint();
     Vector<> sum(dim);
     sum = 0.0;
@@ -60,15 +60,15 @@ namespace ngfem
       BaseMappedIntegrationRule & mir = trafo(ir, lh);
       FlatMatrix<> vals1(ir.Size(), dim, lh);
       FlatMatrix<> vals2(ir.Size(), dim, lh);
-      c1->Evaluate (mir, vals1);
+      cf->Evaluate (mir, vals1);
       auto mirpts = mir.GetPoints();
       mirpts *= -1;
       for (int i = 0; i < mirpts.Height(); i++)
         mirpts.Row(i) += point;
       // at this point, mir probably has the wrong ElementTransformation
-      // but it doesn't matter as long as c2 only uses the global points
+      // but it doesn't matter as long as kernel only uses the global points
       // TODO: ip.SetNr(-666)
-      c2->Evaluate (mir, vals2);
+      kernel->Evaluate (mir, vals2);
       for (int i = 0; i < vals1.Height(); i++)
         hsum += mir[i].GetWeight() * vals1.Row(i) * vals2.Row(i);
       for(size_t i = 0; i<dim;i++)
@@ -111,7 +111,7 @@ namespace ngfem
         BaseMappedIntegrationRule & convMIR = trafo(convIR, lh);
         FlatMatrix<> vals1(convIR.Size(), 1, lh);
 
-        c1->Evaluate (convMIR, vals1);
+        cf->Evaluate (convMIR, vals1);
 
         auto mirpts = convMIR.GetPoints();
 
@@ -121,9 +121,9 @@ namespace ngfem
           {
             FlatVector<double> newpt = points.Row(j) - mirpts.Row(k) | lh;
             // dummy MIP doesn't have the correct ElementTransformation
-            // but it doesn't matter as long as c2 only uses the actual point, not the trafo
+            // but it doesn't matter as long as kernel only uses the actual point, not the trafo
             // should be ok for most convolution kernels
-            auto val2 = convMIR[k].GetWeight() * c2->Evaluate(DummyMIPFromPoint(newpt, lh));
+            auto val2 = convMIR[k].GetWeight() * kernel->Evaluate(DummyMIPFromPoint(newpt, lh));
             mat(j, col+k) = val2;
             values(j, 0) += vals1(k) * val2;
           }
@@ -142,7 +142,7 @@ namespace ngfem
         auto & convMIR = trafo(convIR, lh);
         FlatMatrix<> vals1(convIR.Size(), 1, lh);
 
-        c1->Evaluate(convMIR, vals1);
+        cf->Evaluate(convMIR, vals1);
         values += it->second.Cols(col, col+convIR.Size()) * vals1;
         col += convIR.Size();
       }
@@ -159,6 +159,23 @@ namespace ngfem
     }
     cout << endl << endl;
   }
+
+  void ConvolutionCoefficientFunction::CacheCF()
+  {
+    cfLUT.resize(ma->GetNE());
+    LocalHeap glh(100000, "convolution cachecf lh");
+    ma->IterateElements
+      (VOL, glh, [&] (ngcomp::Ngs_Element el, LocalHeap & lh)
+       {
+         auto & trafo = ma->GetTrafo (el, lh);
+         SIMD_IntegrationRule convIR(trafo.GetElementType(), order);
+         auto & convMIR = trafo(convIR, lh);
+         cfLUT[el.Nr()].SetSize(1, convIR.Size());
+
+         cf->Evaluate(convMIR, cfLUT[el.Nr()]);
+       });
+  }
+
 
   void ConvolutionCoefficientFunction :: Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
   {
@@ -196,9 +213,13 @@ namespace ngfem
         //cout << "convIR " << convIR << endl << endl;
         auto & convMIR = trafo(convIR, lh);
         //cout << "convMIR " << convMIR << endl << endl;
-        FlatMatrix<SIMD<double>> vals1(1, convIR.Size(), lh);
+        const FlatMatrix<SIMD<double>> *vals1;
+        if (! cfLUT.empty()) vals1 = &cfLUT[i];
+        else {
+          vals1 = new (lh) FlatMatrix<SIMD<double>>(1, convIR.Size(), lh);
 
-        c1->Evaluate (convMIR, vals1);
+          cf->Evaluate(convMIR, *vals1);
+        }
         //cout << "vals1 " << vals1 << endl << endl;
 
         auto mirpts = convMIR.GetPoints();
@@ -210,7 +231,7 @@ namespace ngfem
         size_t newSize = ir.Size()*convIR.Size()*SIMD<IntegrationPoint>::Size();
         FlatArray<SIMD<IntegrationPoint>> newIPs(newSize, lh);
         // dummy MIP doesn't have the correct ElementTransformation
-        // but it doesn't matter as long as c2 only uses the actual points, not the trafo
+        // but it doesn't matter as long as kernel only uses the actual points, not the trafo
         // should be ok for most convolution kernels
         SIMD_BaseMappedIntegrationRule *newBMIR;
         switch (ir.DimSpace())
@@ -239,7 +260,7 @@ namespace ngfem
         }
 
         //cout << "newBMIR " << *newBMIR << endl << endl;
-        c2->Evaluate(*newBMIR, mat.Rows(row, row+SIMD<IntegrationPoint>::Size()*convIR.Size()));
+        kernel->Evaluate(*newBMIR, mat.Rows(row, row+SIMD<IntegrationPoint>::Size()*convIR.Size()));
         //cout << "vals 2 " << endl << mat.Rows(row, SIMD<IntegrationPoint>::Size()*row+convIR.Size()) << endl << endl;
         //cout << "weights" << endl;
         for (auto j : Range(convIR.Size()))
@@ -248,7 +269,8 @@ namespace ngfem
           {
             mat.Row(row+j*SIMD<IntegrationPoint>::Size()+m) *= convMIR[j].GetWeight()[m];
             for (auto k : Range(ir.Size()))
-                values(0, k) += vals1(j)[m] * mat(row+j*SIMD<IntegrationPoint>::Size()+m, k);
+              values(0, k) += (*vals1)(j)[m] * mat(row+j*SIMD<IntegrationPoint>::Size()+m, k);
+            // values(0, k) += vals1(j)[m] * mat(row+j*SIMD<IntegrationPoint>::Size()+m, k);
           }
           // cout << k << ": " << convMIR[k].GetMeasure() << " " << convMIR[k].IP().Weight() << " " << "w " <<  convMIR[k].GetWeight() << endl;
         }
@@ -269,17 +291,21 @@ namespace ngfem
         ElementId ei(VOL, i);
         auto & trafo = ma->GetTrafo (ei, lh);
         SIMD_IntegrationRule convIR(trafo.GetElementType(), order);
-        auto & convMIR = trafo(convIR, lh);
-        FlatMatrix<SIMD<double>> vals1(1, convIR.Size(), lh);
+        const FlatMatrix<SIMD<double>> *vals1;
+        if (! cfLUT.empty()) vals1 = &cfLUT[i];
+        else {
+          auto & convMIR = trafo(convIR, lh);
+          vals1 = new (lh) FlatMatrix<SIMD<double>>(1, convIR.Size(), lh);
 
-        c1->Evaluate(convMIR, vals1);
+          cf->Evaluate(convMIR, *vals1);
+        }
 
         for (auto j : Range(convIR.Size()))
         {
           for (auto m : Range(SIMD<IntegrationPoint>::Size()))
           {
             for (auto k : Range(ir.Size()))
-                values(0, k) += vals1(j)[m] * it->second(row+j*SIMD<IntegrationPoint>::Size()+m, k);
+              values(0, k) += (*vals1)(j)[m] * it->second(row+j*SIMD<IntegrationPoint>::Size()+m, k);
           }
         }
         row += SIMD<IntegrationPoint>::Size()*convIR.Size();
@@ -289,15 +315,15 @@ namespace ngfem
 
   // double ConvolutionCoefficientFunction::EvaluateConst () const
   // {
-  //   return c2->EvaluateConst();
+  //   return kernel->EvaluateConst();
   // }
 
   // void ConvolutionCoefficientFunction::Evaluate(const BaseMappedIntegrationPoint & ip,
   //                       FlatVector<> result) const
   // {
   //   IntegrationPoint outip;
-  //   Vector<> res1(c1->Dimension());
-  //   c1->Evaluate(ip, res1);
+  //   Vector<> res1(cf->Dimension());
+  //   cf->Evaluate(ip, res1);
   //   int el = ma->FindElementOfPoint(res1, outip, false);
   //   if (el == -1)
   //   {
@@ -306,6 +332,6 @@ namespace ngfem
   //   }
   //   LocalHeap lh(100000);
   //   BaseMappedIntegrationPoint mappedip(outip, ma->GetTrafo(el, lh));
-  //   c2->Evaluate(mappedip, result);
+  //   kernel->Evaluate(mappedip, result);
   // }
 }

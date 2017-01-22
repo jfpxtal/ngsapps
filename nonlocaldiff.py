@@ -27,7 +27,7 @@ thin = 1
 k0 = 1
 K = k0*exp(-thin*(x*x+y*y))
 
-vtkoutput = True
+vtkoutput = False
 
 #mesh = Mesh (unit_square.GenerateMesh(maxh=0.1))
 from netgen.geom2d import SplineGeometry
@@ -80,18 +80,20 @@ if vtkoutput:
 
 input("")
 t = 0.0
-while t < tend:
-    print("do convolution")
-    g.Set(conv)
-    print("...done\n")
-    a.Assemble()
-    smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
-    rhs.data = mmat * s.vec + tau*f.vec
-    s.vec.data = smat.Inverse(fes.FreeDofs()) * rhs
+with TaskManager():
+    while t < tend:
+        print("do convolution")
+        conv.CacheCF()
+        g.Set(conv)
+        print("...done\n")
+        a.Assemble()
+        smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
+        rhs.data = mmat * s.vec + tau*f.vec
+        s.vec.data = smat.Inverse(fes.FreeDofs()) * rhs
 
-    t += tau
-    print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
-    Redraw(blocking=False)
-    
-    if vtkoutput:
-        vtk.Do()    
+        t += tau
+        print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
+        Redraw(blocking=False)
+
+        if vtkoutput:
+            vtk.Do()

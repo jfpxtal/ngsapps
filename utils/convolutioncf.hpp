@@ -11,8 +11,8 @@ namespace ngfem
 
   class ConvolutionCoefficientFunction : public CoefficientFunction
   {
-    shared_ptr<CoefficientFunction> c1;
-    shared_ptr<CoefficientFunction> c2;
+    shared_ptr<CoefficientFunction> cf;
+    shared_ptr<CoefficientFunction> kernel;
     shared_ptr<ngcomp::MeshAccess> ma;
     int order;
 
@@ -27,9 +27,10 @@ namespace ngfem
     mutable vector<pair<map<int, typename ngbla::Matrix<>>, shared_timed_mutex>> kernelLUT;
     // TODO: do we really need two different LUTs?
     mutable vector<pair<map<int, typename ngbla::Matrix<SIMD<double>>>, shared_timed_mutex>> SIMD_kernelLUT;
+    vector<typename ngbla::Matrix<SIMD<double>>> cfLUT;
   public:
-    ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
-                                    shared_ptr<CoefficientFunction> ac2,
+    ConvolutionCoefficientFunction (shared_ptr<CoefficientFunction> acf,
+                                    shared_ptr<CoefficientFunction> akernel,
                                     shared_ptr<ngcomp::MeshAccess> ama, int aorder);
     virtual ~ConvolutionCoefficientFunction ();
     ///
@@ -41,6 +42,7 @@ namespace ngfem
     // virtual void Evaluate (const BaseMappedIntegrationPoint & ip, FlatVector<> result) const;
     virtual void TraverseTree (const function<void(CoefficientFunction&)> & func);
     virtual void PrintReport (ostream & ost) const;
+    void CacheCF();
   };
 
   class LambdaCoefficientFunction : public CoefficientFunction
