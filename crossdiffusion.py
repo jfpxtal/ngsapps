@@ -5,7 +5,7 @@ from ngsapps.utils import *
 import numpy as np
 
 order = 3
-maxh = 0.15
+maxh = 0.10
 
 convOrder = 3
 
@@ -18,12 +18,12 @@ Db = 0.3
 # advection potentials
 # gradVr = CoefficientFunction((1.0, 0.0))
 # gradVb = -gradVr
-Vr = -x
-Vb = x
+Vr = -2*x-y
+Vb = 2*x+y
 
 # time step and end
 tau = 0.05
-tend = 25
+tend = -1
 
 # jump penalty
 eta = 50
@@ -34,10 +34,26 @@ geo = SplineGeometry()
 # the top one is used as domain for the actual calculations and for the visualization of species red
 # the bottom one is only used for visualization of species blue
 geo.SetMaterial(1, 'top')
-geo.SetMaterial(2, 'bottom')
 geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
-geo.AddRectangle((0, -1.3), (2, -0.3), leftdomain=2)
-mesh = Mesh(geo.GenerateMesh(maxh=maxh))
+geo.AddRectangle((0.2, 0.2), (0.9, 0.8), leftdomain=0, rightdomain=1)
+geo.AddRectangle((1.1, 0.2), (1.8, 0.8), leftdomain=0, rightdomain=1)
+# generate mesh on top rectangle
+netmesh = geo.GenerateMesh(maxh=maxh)
+# now add a copy of the mesh, translated down by 1.3 units
+vdict = dict()
+face2 = netmesh.Add(FaceDescriptor(domin=2, bc=2))
+netmesh.SetMaterial(face2, 'bottom')
+for el in netmesh.Elements2D():
+    pids = []
+    for v in el.vertices:
+        if v not in vdict:
+            mp = netmesh[v]
+            vdict[v] = netmesh.Add(MeshPoint(Pnt(mp[0], mp[1]-1.3, mp[2])))
+        pids.append(vdict[v])
+
+    netmesh.Add(Element2D(face2, pids))
+
+mesh = Mesh(netmesh)
 topMat = mesh.Materials('top')
 
 # finite element space
@@ -209,8 +225,8 @@ mstar = m.mat.CreateMatrix()
 # translate density b2 of blue species to bottom rectangle
 both = r2 + Compose((x, y+1.3), b2, mesh)
 both2 = rinfty + Compose((x, y+1.3), binfty, mesh)
-Draw(both, mesh, 'both')
 Draw(both2, mesh, 'stationary')
+Draw(both, mesh, 'both')
 
 
 times = [0.0]
