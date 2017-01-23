@@ -7,7 +7,7 @@ import numpy as np
 order = 3
 maxh = 0.15
 
-convOrder = 3;
+convOrder = 3
 
 # diffusion coefficients
 # red species
@@ -52,28 +52,26 @@ tr, tb = fes.TestFunction()
 s = GridFunction(fes)
 r2 = s.components[0]
 b2 = s.components[1]
-# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0), definedon=topMat)
-# b2.Set(IfPos(x-1.8, 0.6, 0), definedon=topMat)
-r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)), definedon=topMat)
-b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)), definedon=topMat)
-#r2.Set(0.5+0*x, definedon=topMat)
-#b2.Set(0.5+0*x, definedon=topMat)
+# r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0))
+# b2.Set(IfPos(x-1.8, 0.6, 0))
+r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
+b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
+#r2.Set(0.5+0*x)
+#b2.Set(0.5+0*x)
 
 # convolution
 thin = 200
 k0 = 20
 K = k0*exp(-thin*(x*x+y*y))
-convr = Convolve(r2, GaussKernel(scal=20, var=200), mesh, convOrder)
-convb = Convolve(b2, GaussKernel(scal=20, var=200), mesh, convOrder)
-#convr = Convolve(r2, K, mesh, convOrder)
-#convb = Convolve(b2, K, mesh, convOrder)
+convr = Convolve(r2, K, mesh, convOrder)
+convb = Convolve(b2, K, mesh, convOrder)
 
 # GridFunctions for caching of convolution values and automatic gradient calculation
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(Vr+0*convr, definedon=topMat)
-gridb.Set(Vb+0*convb, definedon=topMat)
+gridr.Set(Vr+0*convr)
+gridb.Set(Vb+0*convb)
 velocityr = -(1-r2-b2)*grad(gridr)
 velocityb = -(1-r2-b2)*grad(gridb)
 
@@ -94,35 +92,35 @@ wr = wb = 0.5
 
 # equation for r
 a += SymbolicBFI(Dr*grad(r)*grad(tr))
-a += SymbolicBFI(-Dr*0.5*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Dr*0.5*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Dr*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Dr*0.5*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(-Dr*0.5*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
+a += SymbolicBFI(Dr*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
 
 a += SymbolicBFI(-Dr*b2*grad(r)*grad(tr))
-a += SymbolicBFI(Dr*wb*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Dr*wb*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Dr*2*wb*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Dr*wb*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(Dr*wb*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
+a += SymbolicBFI(-Dr*2*wb*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
 
 a += SymbolicBFI(Dr*r2*grad(b)*grad(tr))
-a += SymbolicBFI(-Dr*wr*(grad(b) + grad(b.Other())) * n * (tr - tr.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Dr*wr*(grad(tr)+grad(tr.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Dr*2*wr*eta / h * (b - b.Other()) * (tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Dr*wr*(grad(b) + grad(b.Other())) * n * (tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(-Dr*wr*(grad(tr)+grad(tr.Other())) * n * (b - b.Other()), skeleton=True)
+a += SymbolicBFI(Dr*2*wr*eta / h * (b - b.Other()) * (tr - tr.Other()), skeleton=True)
 
 # equation for b
 a += SymbolicBFI(Db*grad(b)*grad(tb))
-a += SymbolicBFI(-Db*0.5*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Db*0.5*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Db*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Db*0.5*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(-Db*0.5*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
+a += SymbolicBFI(Db*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
 
 a += SymbolicBFI(-Db*r2*grad(b)*grad(tb))
-a += SymbolicBFI(Db*wr*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Db*wr*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Db*2*wr*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(Db*wr*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(Db*wr*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
+a += SymbolicBFI(-Db*2*wr*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
 
 a += SymbolicBFI(Db*b2*grad(r)*grad(tb))
-a += SymbolicBFI(-Db*wb*(grad(r) + grad(r.Other())) * n * (tb - tb.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(-Db*wb*(grad(tb) + grad(tb.Other())) * n * (r - r.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(Db*2*wb*eta / h * (r - r.Other()) * (tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(-Db*wb*(grad(r) + grad(r.Other())) * n * (tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(-Db*wb*(grad(tb) + grad(tb.Other())) * n * (r - r.Other()), skeleton=True)
+a += SymbolicBFI(Db*2*wb*eta / h * (r - r.Other()) * (tb - tb.Other()), skeleton=True)
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -132,13 +130,13 @@ def abs(x):
 
 # equation for r
 a += SymbolicBFI(-r*velocityr*grad(tr))
-a += SymbolicBFI(velocityr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(0.5*abs(velocityr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(velocityr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True)
+a += SymbolicBFI(0.5*abs(velocityr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True)
 
 # equation for b
 a += SymbolicBFI(-b*velocityb*grad(tb))
-a += SymbolicBFI(velocityb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
-a += SymbolicBFI(0.5*abs(velocityb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True, definedon=topMat)
+a += SymbolicBFI(velocityb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True)
+a += SymbolicBFI(0.5*abs(velocityb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True)
 
 # mass matrix
 m = BilinearForm(fes)
@@ -216,7 +214,7 @@ Draw(both2, mesh, 'stationary')
 
 
 times = [0.0]
-entropy = ZLogZCF(r2/rinfty) + ZLogZCF(b2/binfty) + ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
+entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
@@ -230,9 +228,10 @@ with TaskManager():
         print("\nt = {:10.6e}".format(t))
         t += tau
 
-        print('Calculating convolution integrals...')
-#        gridr.Set(Vr+convr, definedon=topMat)
-#        gridb.Set(Vb+convb, definedon=topMat)
+        # print('Calculating convolution integrals...')
+        # with ConvolutionCache(convr), ConvolutionCache(convb):
+        #     gridr.Set(Vr+convr)
+        #     gridb.Set(Vb+convb)
         print('Assembling a...')
         a.Assemble()
 
@@ -249,11 +248,11 @@ with TaskManager():
         line.set_ydata(ents)
         ax.relim()
         ax.autoscale_view()
- #       fig.canvas.draw()
+        fig.canvas.draw()
         # input()
 
 outfile = open('ents_dg.csv','w')
 for item in ents:
-        outfile.write("%s\n" % item)
+    outfile.write("%s\n" % item)
 outfile.close()
 

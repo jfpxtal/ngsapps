@@ -74,14 +74,23 @@ void ExportNgsAppsUtils(py::module &m)
 
   typedef PyWrapperDerived<ConvolutionCoefficientFunction, CoefficientFunction> PyConvolveCF;
   py::class_<PyConvolveCF,PyCF>
-    (m, "Convolve", "convolution of two coefficient functions")
+    (m, "Convolve", "convolution of a general coefficient function with a coefficient function representing a kernel")
     .def ("__init__",
-          [] (PyConvolveCF *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma, int order)
+          [] (PyConvolveCF *instance, py::object cf, py::object kernel, shared_ptr<ngcomp::MeshAccess> ma, int order)
           {
-            new (instance) PyConvolveCF(make_shared<ConvolutionCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma, order));
+            new (instance) PyConvolveCF(make_shared<ConvolutionCoefficientFunction>(MakeCoefficient(cf).Get(), MakeCoefficient(kernel).Get(), ma, order));
           },
-          py::arg("cf1"), py::arg("cf2"), py::arg("mesh"), py::arg("order")=5
-      );
+          py::arg("cf"), py::arg("kernel"), py::arg("mesh"), py::arg("order")=5
+      )
+  .def("CacheCF", [](PyConvolveCF & self)
+       {
+         self->CacheCF();
+       })
+  .def("ClearCFCache", [](PyConvolveCF & self)
+        {
+          self->ClearCFCache();
+        })
+    ;
 
   typedef PyWrapperDerived<SymbolicBilinearFormIntegrator, BilinearFormIntegrator> PySymBFI;
   py::class_<PySymBFI, PyBFI>
