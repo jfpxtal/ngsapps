@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from ngsapps.utils import *
 import numpy as np
 
-order = 1
+order = 2
 conv_order = 3
-maxh = 0.3
+maxh = 0.2
 
 # time step and end
 tau = 0.01
@@ -80,18 +80,19 @@ if vtkoutput:
 
 input("")
 t = 0.0
-while t < tend:
-    print("do convolution")
-    g.Set(conv)
-    print("...done\n")
-    a.Assemble()
-    smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
-    rhs.data = mmat * s.vec + tau*f.vec
-    s.vec.data = smat.Inverse(fes.FreeDofs()) * rhs
-
-    t += tau
-    print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
-    Redraw(blocking=False)
+with TaskManager():
+    while t < tend:
+        print("do convolution")
+        g.Set(conv)
+        print("...done\n")
+        a.Assemble()
+        smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
+        rhs.data = mmat * s.vec + tau*f.vec
+        s.vec.data = smat.Inverse(fes.FreeDofs()) * rhs
     
-    if vtkoutput:
-        vtk.Do()    
+        t += tau
+        print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
+        Redraw(blocking=False)
+    
+        if vtkoutput:
+            vtk.Do()    
