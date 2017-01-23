@@ -4,12 +4,10 @@ import matplotlib.pyplot as plt
 from ngsapps.utils import *
 import numpy as np
 
-outfile = open('crossdiff_paramtest.csv','w')
-outfile.write('# order, maxh, eta, er, eb')
-
 for order in [3, 2, 1]:
     for maxh in [0.1, 0.15, 0.3]:
         for eta in [20, 50, 80, 110, 1000]:
+
             # order = 3
             # maxh = 0.10
             # maxh = 0.1
@@ -216,13 +214,13 @@ for order in [3, 2, 1]:
             # translate density b2 of blue species to bottom rectangle
             both = r2 + Compose((x, y+1.3), b2, mesh)
             both2 = rinfty + Compose((x, y+1.3), binfty, mesh)
-            Draw(both, mesh, 'both')
             Draw(both2, mesh, 'stationary')
+            Draw(both, mesh, 'both')
 
 
             # times = [0.0]
-            # entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
-            # ents = [Integrate(entropy, mesh, definedon=topMat)]
+            entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
+            ents = [Integrate(entropy, mesh, definedon=topMat)]
             # fig, ax = plt.subplots()
             # line, = ax.plot(times, ents)
             # plt.show(block=False)
@@ -250,7 +248,7 @@ for order in [3, 2, 1]:
 
                     Redraw(blocking=False)
                     # times.append(t)
-                    # ents.append(Integrate(entropy, mesh, definedon=topMat))
+                    ents.append(Integrate(entropy, mesh, definedon=topMat))
                     # line.set_xdata(times)
                     # line.set_ydata(ents)
                     # ax.relim()
@@ -260,10 +258,10 @@ for order in [3, 2, 1]:
 
             er = Integrate(pow(rinfty-r2, 2), mesh, definedon=topMat)
             eb = Integrate(pow(binfty-b2, 2), mesh, definedon=topMat)
+            outfile = open('data/crossdiff/ents_'+str(order)+'_'+str(maxh)+'_'+str(eta)+'.csv', 'w')
             print('{}, {}, {}, {}, {}'.format(order, maxh, eta, er, eb))
-            outfile.write('{}, {}, {}, {}, {}'.format(order, maxh, eta, er, eb))
-            # outfile = open('ents_dg.csv','w')
-            # for item in ents:
-            #     outfile.write("%s\n" % item)
-            # outfile.close()
+            outfile.write('{}, {}\n'.format(er, eb))
+            for item in ents:
+                outfile.write('{}\n'.format(item))
+            outfile.close()
 

@@ -11,6 +11,7 @@
 \usepackage{amsgen}
 \usepackage{amsthm}
 \usepackage{color}
+\usepackage{pgfplots}
 
 %\usepackage{showkeys}
 
@@ -108,7 +109,7 @@
 \subsubsection*{Introduction}
 For $x\in\Omega\subset \RR^N$ open and bounded. and $t>0$, we are interested in following \textbf{two problems}:
 \begin{align}\label{eq:porousfem}
-\mathrm{(P1)}\quad\partial_t \rho = \nabla\cdot (\rho [ \eps\nabla \rho^{m-1} + \nabla K \ast \rho]),
+\mathrm{(P1)}\quad\partial_t \rho = \nabla\cdot (\rho [ \eps\nabla \rho^{m-1} - \nabla K \ast \rho]),
 \end{align}
 $m\in (1,\infty)$, supplemented with the initial conditions
 \begin{equation}
@@ -136,7 +137,7 @@ First of all, note that in the case $D_1=D_2=1$ and $V=W$, we can add the two eq
 \begin{align}\label{eq:sum}
  \partial_t \rho = \nabla\cdot (\nabla \rho + \rho(1-\rho)\nabla V).
 \end{align}
-Chosing $V = K \ast \rho$, we end up with problem (P1).
+Chosing $V = -K \ast \rho$, we end up with problem (P1).
 \subsubsection*{DG Methods}
 Both problems are degenerate parabolic and may thus easily become convection domminated. Furthermore, in some applications, we are interested in the case of small diffusion, e.g. $D_1 = D_2 = \eps << 1$. This motivates / might motivate the use of discontinuous Galerkin methods.
 \subsection*{Boundary conditions and Kernels $K$}
@@ -234,6 +235,37 @@ Integrating equation \eqref{eq:entdiss} w.r.t time, we obtain
  \item\textbf{Combinations} Use the schemes from above to solve (P2) but with potential given as in (P1), i.e. $V=c_{11} K\ast r + c_{12}K\ast b$, $W=c_{22} K\ast b + c_{21}K\ast r$, \rr{see our recent preprint \cite{Berendsen2016} for details}.
  
 \end{itemize}
+
+\subsection*{Results}
+\subsubsection*{Entropy rates}
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    % choose params to plot here
+    % order/maxh/eta
+    \def\lineparams{1/0.3/20, 3/0.1/1000}
+    \begin{axis}[
+      title={Entropy rates},
+      width=\textwidth,
+      only marks,
+      mark size=1pt,
+      xlabel=Time,
+      ylabel=Entropy,
+      legend pos=north east
+      ]
+    \foreach \ord/\maxh/\et in \lineparams
+    {
+      \addplot+ table [skip first n=1, y index=0, x expr={\coordindex*0.05}] {../data/crossdiff/ents_\ord_\maxh_\et.csv};
+      \addlegendentryexpanded{$\text{order}=\ord$, $\text{maxh}=\maxh$, $\eta=\et$}
+    }
+    \end{axis}
+  \end{tikzpicture}
+  % \caption{topf}
+  \label{fig:entrates}
+\end{figure}
+
+
 
 % \subsection*{Optimal control problem}
 % \rr{Wirklich ?}
