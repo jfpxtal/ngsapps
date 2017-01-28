@@ -3,6 +3,7 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   lagrangefespace.hpp lagrangefespace.cpp lagrangefe.hpp lagrangefe.cpp
   myvtkoutput.hpp myvtkoutput.cpp
   composecf.hpp composecf.cpp
+  parameterlf.hpp parameterlf.cpp
   convolutioncf.hpp convolutioncf.cpp
   cachecf.hpp cachecf.cpp
   zlogzcf.hpp zlogzcf.cpp

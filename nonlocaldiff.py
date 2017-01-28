@@ -25,7 +25,9 @@ D = 1
 # Convolution kernel
 thin = 1
 k0 = 1
-K = k0*exp(-thin*(x*x+y*y))
+def sqr(x):
+    return x*x
+K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 
 vtkoutput = False
 
@@ -48,7 +50,7 @@ s.Set(IfPos(RandomCF(0.0,1.0)+1,RandomCF(0.0,1.0)+1,0))
 
 v = GridFunction (fes)
 
-conv = Convolve(s, K, mesh, conv_order)
+conv = ParameterLF(w*K, s, conv_order)
 
 # the bilinear-form
 g = GridFunction(fes)
@@ -83,8 +85,7 @@ t = 0.0
 with TaskManager():
     while t < tend:
         print("do convolution")
-        with ConvolutionCache(conv):
-            g.Set(conv)
+        g.Set(conv)
         print("...done\n")
         a.Assemble()
         smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()

@@ -5,6 +5,7 @@
 #include "randomcf.hpp"
 #include "composecf.hpp"
 #include "convolutioncf.hpp"
+#include "parameterlf.hpp"
 #include "cachecf.hpp"
 #include "zlogzcf.hpp"
 
@@ -31,27 +32,6 @@ void ExportNgsAppsUtils(py::module &m)
           py::arg("lower")=0.0, py::arg("upper")=1.0
       );
 
-  // typedef PyWrapperDerived<LambdaCoefficientFunction,CoefficientFunction> PyLambdaCF;
-  // py::class_<PyLambdaCF, PyCF>(m, "LambdaCF");//.def(py::init<>());
-  typedef PyWrapperDerived<GaussKernel,CoefficientFunction> PyGaussCF;
-  py::class_<PyGaussCF, PyCF>
-    (m, "GaussKernel")
-    .def("__init__",
-         [](PyGaussCF *instance, double scal, double var)
-         {
-           new (instance) PyGaussCF(make_shared<GaussKernel> (scal, var));
-         },
-         py::arg("scal")=1.0, py::arg("var")=1.0)
-    .def("Dx", [](PyGaussCF & self)
-         {
-           return PyCF(self->Dx());
-         })
-    .def("Dy", [](PyGaussCF & self)
-         {
-           return PyCF(self->Dy());
-         })
-       ;
-
   typedef PyWrapperDerived<ZLogZCoefficientFunction,CoefficientFunction> PyZLogZ;
   py::class_<PyZLogZ, PyCF>
     (m, "ZLogZCF")
@@ -72,9 +52,40 @@ void ExportNgsAppsUtils(py::module &m)
           })
     ;
 
+  typedef PyWrapperDerived<ParameterLFProxy, CoefficientFunction> PyParameterLFProxy;
+  py::class_<PyParameterLFProxy,PyCF>
+    (m, "ParameterLFProxy", "xPar, yPar, zPar coordinates for ParameterLF")
+    .def("__init__",
+         [](PyParameterLFProxy *instance, int direction)
+         {
+           new (instance) PyParameterLFProxy(make_shared<ParameterLFProxy>(direction));
+         })
+    ;
+
+  typedef PyWrapper<ngcomp::GridFunction> PyGF;
+  typedef PyWrapperDerived<ParameterLinearFormCF, CoefficientFunction> PyParameterLF;
+  py::class_<PyParameterLF,PyCF>
+    (m, "ParameterLF",
+      "Parameterized LinearForm\n"
+      "This coefficient function calculates the value of the parameterized integral\n"
+      "I(xPar, yPar, zPar) = \\int integrand(x, y, z, xPar, yPar, zPar) d(x, y, z)\n"
+      "gf is a GridFunction\n"
+      "integrand is a CoefficientFunction which linearly contains a TestFunction from the FESpace to which gf belongs.\n"
+      "When calculating the integral, the test function is then replaced by gf.")
+    .def ("__init__",
+          [] (PyParameterLF *instance, py::object integrand, PyGF gf, int order)
+          {
+            new (instance) PyParameterLF(make_shared<ParameterLinearFormCF>(MakeCoefficient(integrand).Get(), gf.Get(), order));
+          },
+          py::arg("integrand"), py::arg("gf"), py::arg("order")=5
+      )
+    ;
+
   typedef PyWrapperDerived<ConvolutionCoefficientFunction, CoefficientFunction> PyConvolveCF;
   py::class_<PyConvolveCF,PyCF>
-    (m, "Convolve", "convolution of a general coefficient function with a coefficient function representing a kernel")
+    (m, "ConvolveCF",
+      "convolution of a general coefficient function with a coefficient function representing a kernel\n"
+      "to calculate repeated convolutions of GridFunctions, use ParameterLF")
     .def ("__init__",
           [] (PyConvolveCF *instance, py::object cf, py::object kernel, shared_ptr<ngcomp::MeshAccess> ma, int order)
           {
@@ -82,32 +93,15 @@ void ExportNgsAppsUtils(py::module &m)
           },
           py::arg("cf"), py::arg("kernel"), py::arg("mesh"), py::arg("order")=5
       )
-  .def("CacheCF", [](PyConvolveCF & self)
-       {
-         self->CacheCF();
-       })
-  .def("ClearCFCache", [](PyConvolveCF & self)
-        {
-          self->ClearCFCache();
-        })
+    .def("CacheCF", [](PyConvolveCF & self)
+         {
+           self->CacheCF();
+         })
+    .def("ClearCFCache", [](PyConvolveCF & self)
+         {
+           self->ClearCFCache();
+         })
     ;
-
-  typedef PyWrapperDerived<SymbolicBilinearFormIntegrator, BilinearFormIntegrator> PySymBFI;
-  py::class_<PySymBFI, PyBFI>
-    (m, "SymbolicBFI_NoDG", "symbolic bfi without dg terms, needed for cachecf")
-    .def ("__init__",
-          [](PySymBFI *instance, PyCF cf, VorB vb, bool element_boundary, py::object definedon)
-           {
-             py::extract<ngcomp::Region> defon_region(definedon);
-             if (defon_region.check())
-               vb = VorB(defon_region());
-
-             new (instance) PySymBFI(make_shared<SymbolicBilinearFormIntegrator> (cf.Get(), vb, element_boundary));
-           },
-          py::arg("form"), py::arg("VOL_or_BND")=VOL,
-          py::arg("element_boundary")=false,
-          py::arg("definedon")=DummyArgument()
-     );
 
   typedef PyWrapperDerived<CacheCoefficientFunction, CoefficientFunction> PyCacheCF;
   py::class_<PyCacheCF,PyCF>

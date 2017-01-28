@@ -33,7 +33,9 @@ u = CoefficientFunction((1.0, 0.0))
 thin = 200
 k0 = 5
 # k0 = 1
-K = k0*exp(-thin*(x*x+y*y))
+def sqr(x):
+    return x*x
+K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 # partial derivatives
 # Kdx = -2*k0*thin*x*exp(-thin*(x*x+y*y))
 # Kdy = -2*k0*thin*y*exp(-thin*(x*x+y*y))
@@ -97,15 +99,8 @@ rho2 = GridFunction(fes)
 rho2.Set(CoefficientFunction(0.5))
 # rho2.Set(CoefficientFunction(0.0))
 
-# set up coefficient functions for convolution terms
-# and caches to prevent unnecessary calculation in aconv.Assemble()
-# convx = Convolve(rho2, Kdx, mesh, conv_order)
-# convy = Convolve(rho2, Kdy, mesh, conv_order)
-conv = Convolve(rho2, K, mesh, conv_order)
-# convx = Convolve(grad(rho2)[0], K, mesh, conv_order)
-# convy = Convolve(grad(rho2)[1], K, mesh, conv_order)
-# convx_cache = Cache(convx, fes)
-# convy_cache = Cache(convy, fes)
+# set up coefficient function for convolution terms
+conv = ParameterLF(phi*K, rho2, conv_order)
 
 # special values for DG
 n = specialcf.normal(mesh.dim)
@@ -174,7 +169,7 @@ Draw(g, mesh, 'conv')
 Draw(rho2, mesh, 'rho')
 
 times = [0.0]
-entropy = ZLogZCF(rho2) - rho2*V + ZLogZCF(1-rho2) + rho2*conv
+entropy = ZLogZCF(rho2) - rho2*V + ZLogZCF(1-rho2) + rho2*g
 ents = [Integrate(entropy, mesh)]
 fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
@@ -194,9 +189,8 @@ with TaskManager():
 
         # print('Assembling aupw...')
         aupw.Assemble()
-        # print('Calculating convolution integrals...')
-        with ConvolutionCache(conv):
-            g.Set(conv)
+        # print('Convolution...')
+        g.Set(conv)
         # print('Assembling aconv...')
         aconv.Assemble()
 

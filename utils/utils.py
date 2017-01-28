@@ -5,6 +5,10 @@ from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
                                        FaceDescriptor, Mesh as NetMesh
 from netgen.csg import Pnt
 
+xPar = ParameterLFProxy(0)
+yPar = ParameterLFProxy(1)
+zPar = ParameterLFProxy(2)
+
 def Lagrange(mesh, **args):
     """
     Create H1 finite element space with Lagrange basis.

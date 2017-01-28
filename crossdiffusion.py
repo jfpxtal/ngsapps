@@ -75,19 +75,22 @@ b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
 
+def sqr(x):
+    return x*x
+
 # convolution
 thin = 200
 k0 = 20
-K = k0*exp(-thin*(x*x+y*y))
-convr = Convolve(r2, K, mesh, convOrder)
-convb = Convolve(b2, K, mesh, convOrder)
+K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+convr = ParameterLF(fes1.TestFunction()*K, r2, convOrder)
+convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
 
 # GridFunctions for caching of convolution values and automatic gradient calculation
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(Vr+0*convr)
-gridb.Set(Vb+0*convb)
+gridr.Set(Vr-0*convr)
+gridb.Set(Vb-0*convb)
 velocityr = -(1-r2-b2)*grad(gridr)
 velocityb = -(1-r2-b2)*grad(gridb)
 
@@ -245,9 +248,8 @@ with TaskManager():
         t += tau
 
         # print('Calculating convolution integrals...')
-        # with ConvolutionCache(convr), ConvolutionCache(convb):
-        #     gridr.Set(Vr+convr)
-        #     gridb.Set(Vb+convb)
+        # gridr.Set(Vr-convr)
+        # gridb.Set(Vb-convb)
         print('Assembling a...')
         a.Assemble()
 

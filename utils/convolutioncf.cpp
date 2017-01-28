@@ -313,25 +313,4 @@ namespace ngfem
     }
   }
 
-  // double ConvolutionCoefficientFunction::EvaluateConst () const
-  // {
-  //   return kernel->EvaluateConst();
-  // }
-
-  // void ConvolutionCoefficientFunction::Evaluate(const BaseMappedIntegrationPoint & ip,
-  //                       FlatVector<> result) const
-  // {
-  //   IntegrationPoint outip;
-  //   Vector<> res1(cf->Dimension());
-  //   cf->Evaluate(ip, res1);
-  //   int el = ma->FindElementOfPoint(res1, outip, false);
-  //   if (el == -1)
-  //   {
-  //     result = 0;
-  //     return;
-  //   }
-  //   LocalHeap lh(100000);
-  //   BaseMappedIntegrationPoint mappedip(outip, ma->GetTrafo(el, lh));
-  //   kernel->Evaluate(mappedip, result);
-  // }
 }
