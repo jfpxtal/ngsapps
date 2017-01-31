@@ -30,8 +30,7 @@ namespace ngcomp
 
     virtual void GetDofNrs(ElementId, Array<int> & dnums) const override;
 
-    virtual const FiniteElement & GetFE(int elnr, LocalHeap & lh) const override;
-    virtual const FiniteElement & GetSFE(int selnr, LocalHeap & lh) const override;
+    virtual FiniteElement & GetFE(ElementId ei, Allocator & lh) const override;
 
     virtual void GetVertexDofNrs (int vnr, Array<int> & dnums) const override;
     virtual void GetEdgeDofNrs (int ednr, Array<int> & dnums) const override;

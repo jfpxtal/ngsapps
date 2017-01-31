@@ -1,11 +1,15 @@
 from netgen.geom2d import SplineGeometry
+import geometries
 from ngsolve import *
 import matplotlib.pyplot as plt
 from ngsapps.utils import *
+from ngsapps.merge_meshes import *
+from ngsapps.meshtools import *
 import numpy as np
+from netgen.meshing import Mesh as NgMesh
 
 order = 3
-maxh = 0.10
+maxh = 0.3
 
 convOrder = 3
 
@@ -15,43 +19,37 @@ Dr = 0.1
 # blue species
 Db = 0.3
 
+def sqr(x):
+    return x*x
+
 # advection potentials
 # gradVr = CoefficientFunction((1.0, 0.0))
 # gradVb = -gradVr
-Vr = -2*x-y
-Vb = 2*x+y
+Vr = -x+sqr(y-0.5)
+Vb = x+sqr(y-0.5)
 
 # time step and end
 tau = 0.05
+# tau = 0.005
 tend = -1
 
 # jump penalty
-eta = 50
+eta = 1000
 
 # geometry and mesh
 geo = SplineGeometry()
-# set up two rectangles
-# the top one is used as domain for the actual calculations and for the visualization of species red
-# the bottom one is only used for visualization of species blue
-geo.SetMaterial(1, 'top')
-geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
-geo.AddRectangle((0.2, 0.2), (0.9, 0.8), leftdomain=0, rightdomain=1)
-geo.AddRectangle((1.1, 0.2), (1.8, 0.8), leftdomain=0, rightdomain=1)
-# generate mesh on top rectangle
-netmesh = geo.GenerateMesh(maxh=maxh)
-# now add a copy of the mesh, translated down by 1.3 units
-vdict = dict()
-face2 = netmesh.Add(FaceDescriptor(domin=2, bc=2))
-netmesh.SetMaterial(face2, 'bottom')
-for el in netmesh.Elements2D():
-    pids = []
-    for v in el.vertices:
-        if v not in vdict:
-            mp = netmesh[v]
-            vdict[v] = netmesh.Add(MeshPoint(Pnt(mp[0], mp[1]-1.3, mp[2])))
-        pids.append(vdict[v])
+doms = geometries.patchClamp(geo)
+for d in range(1, doms+1):
+    geo.SetMaterial(d, 'top')
 
-    netmesh.Add(Element2D(face2, pids))
+# generate mesh on top geometry
+netmesh = geo.GenerateMesh(maxh=maxh)
+
+# now add a copy of the mesh, translated down by yoffset, for visualization of species blue
+yoffset = -1.3
+netmesh = merge_meshes(netmesh, netmesh, offset2=(0, yoffset, 0), transfer_mats2=False)
+for d in range(doms+1, nr_materials(netmesh)+1):
+    netmesh.SetMaterial(d, 'bottom')
 
 mesh = Mesh(netmesh)
 topMat = mesh.Materials('top')
@@ -75,9 +73,6 @@ b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
 
-def sqr(x):
-    return x*x
-
 # convolution
 thin = 200
 k0 = 20
@@ -89,8 +84,9 @@ convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
-gridr.Set(Vr-0*convr)
-gridb.Set(Vb-0*convb)
+with TaskManager():
+    gridr.Set(Vr-0*convr)
+    gridb.Set(Vb-0*convb)
 velocityr = -(1-r2-b2)*grad(gridr)
 velocityb = -(1-r2-b2)*grad(gridb)
 
@@ -183,19 +179,18 @@ binfty = rbinfty.components[1]
 def AApply(uv,V,W,mesh):
     mmr = Integrate( exp((uv[0]-V)/Dr) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
     mmb = Integrate( exp((uv[1]-W)/Db) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
-    #w = v * (1 - v) * (v - alpha)
-    # print(dt * np.hstack((w, -w)))
+    # print(np.hstack((mmr, mmb)))
     return (np.hstack((mmr, mmb)))
 
 def AssembleLinearization(uv,V,W,mesh):
     m = np.empty([2,2])
-    m[0,0] = Integrate(exp((uv[0]-V)/Dr)*(1+exp((uv[1]-W)/Db))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Dr),mesh,definedon=topMat)
-    m[0,1] = Integrate(-1/Db*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
+    m[0,0] = Integrate(exp((uv[0]-V)/Dr)*(1+exp((uv[1]-W)/Db))/(sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Dr),mesh,definedon=topMat)
+    m[0,1] = Integrate(-1/Db*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)),mesh,definedon=topMat)
 
-    m[1,0] = Integrate(-1/Dr*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))),mesh,definedon=topMat)
-    m[1,1] = Integrate(exp((uv[1]-W)/Db)*(1+exp((uv[0]-V)/Dr))/((1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Db),mesh,definedon=topMat)
-    
-    # print(dt * Alin.toarray())
+    m[1,0] = Integrate(-1/Dr*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)),mesh,definedon=topMat)
+    m[1,1] = Integrate(exp((uv[1]-W)/Db)*(1+exp((uv[0]-V)/Dr))/(sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Db),mesh,definedon=topMat)
+
+    # print(m)
     return m
 
 updnorm = 1e99
@@ -203,16 +198,18 @@ updnorm = 1e99
 #vinfty = 1
 uvinfty = np.hstack((0.0,0.0))
 # Newton solver
-while updnorm > 1e-9:
-    rhs = AApply(uvinfty,Vr,Vb,mesh) - np.hstack((mr, mb))
-    Alin = AssembleLinearization(uvinfty,Vr,Vb,mesh)
-#    urgh
-    upd = np.linalg.solve(Alin, rhs)
-    
-    updnorm = np.linalg.norm(upd)
-    
-    uvinfty = uvinfty - 0.1*upd
-    # input('')
+print('Start Newton...')
+with TaskManager():
+    while updnorm > 1e-9:
+        rhs = AApply(uvinfty,Vr,Vb,mesh) - np.hstack((mr, mb))
+        Alin = AssembleLinearization(uvinfty,Vr,Vb,mesh)
+    #    urgh
+        upd = np.linalg.solve(Alin, rhs)
+
+        updnorm = np.linalg.norm(upd)
+
+        uvinfty = uvinfty - 0.1*upd
+        # input('')
 
 print('Newton converged with error' + '|w| = {:7.3e} '.format(updnorm),end='\n')
 rinfty.Set(exp((uvinfty[0]-gridr)/Dr) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
@@ -224,10 +221,10 @@ mstar = m.mat.CreateMatrix()
 
 # Draw(r2, mesh, 'r')
 # Draw(b2, mesh, 'b')
-# visualize both species at the same time, red in top rectangle, blue in bottom
-# translate density b2 of blue species to bottom rectangle
-both = r2 + Compose((x, y+1.3), b2, mesh)
-both2 = rinfty + Compose((x, y+1.3), binfty, mesh)
+# visualize both species at the same time, red in top mesh, blue in bottom
+# translate density b2 of blue species to bottom mesh
+both = r2 + Compose((x, y-yoffset), b2, mesh)
+both2 = rinfty + Compose((x, y-yoffset), binfty, mesh)
 Draw(both2, mesh, 'stationary')
 Draw(both, mesh, 'both')
 

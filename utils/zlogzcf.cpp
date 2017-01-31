@@ -20,4 +20,8 @@ namespace ngfem
       return z*log(z);
     }
   }
+  // void ZLogZCoefficientFunction::Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
+  // {
+
+  // }
 }

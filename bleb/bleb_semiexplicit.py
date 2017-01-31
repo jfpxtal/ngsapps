@@ -7,11 +7,12 @@ import scipy.constants as sciconst
 import matplotlib.pyplot as plt
 import random
 import multiprocessing as mp
+import math
 
-usegeo = "circle"
+usegeo = "rect"
 
 order = 3
-maxh = 0.1
+maxh = 0.5
 
 initial_roughness = 20.0
 
@@ -95,16 +96,17 @@ def set_initial_conditions(result_gridfunc, mesh):
 
 if usegeo == "circle":
     geo = SplineGeometry()
-    MakeCircle(geo, (0,0), 1)
+    R = 5
+    MakeCircle(geo, (0,0), R)
     mesh = Mesh(geo.GenerateMesh(maxh=maxh))
     mesh.Curve(order)
 elif usegeo == "square":
     mesh = Mesh(unit_square.GenerateMesh(maxh=maxh))
 elif usegeo == "rect":
-    Lx = 10
-    Ly = 4
+    Lx = 8
+    Ly = 8
     geo = SplineGeometry()
-    geo.AddRectangle((0,0), (10,4))
+    geo.AddRectangle((0,0), (Lx, Ly))
     mesh = Mesh(geo.GenerateMesh(maxh=0.3))
 elif usegeo == "1d":
     netmesh = NetMesh()
@@ -143,8 +145,31 @@ c = BilinearForm(fes)
 c += SymbolicBFI(grad(u) * grad(tmu))
 c += SymbolicBFI(mu * tmu)
 
+width = 0.3
+tParam = [Parameter(0.0) for i in range(3)]
+f = CoefficientFunction(0.0)
+# circle
+# for i in range(8):
+#     f += CoefficientFunction(1e-1*exp(-(sqr(x - 3 * cos(0.1*tParam + i * 2 * math.pi / 8)) + sqr(y - 3 * sin(0.1*tParam + i * 2 * math.pi / 8))) / width))
+
+# square
+for i in range(3):
+    f += CoefficientFunction(1e-1*exp(-(sqr(x - 1 - tParam[i]) + sqr(y-7)) / width))
+for i in range(3):
+    f += CoefficientFunction(1e-1*exp(-(sqr(x - 7 + tParam[i]) + sqr(y-1)) / width))
+for i in range(3):
+    f += CoefficientFunction(1e-1*exp(-(sqr(x - 1) + sqr(y - 1 - tParam[i])) / width))
+for i in range(3):
+    f += CoefficientFunction(1e-1*exp(-(sqr(x - 7) + sqr(y- 7 + tParam[i])) / width))
+
+# f = CoefficientFunction(1e-1*exp(-(sqr(x - tParam * vf) + sqr(y-Ly/2)) / width))
+# f = CoefficientFunction(0.0)
+# f += CoefficientFunction(1e-1*exp(-(sqr(x - Lx / 4 - tParam * vf) + sqr(y-Ly/2)) / width))
+# f += CoefficientFunction(1e-1*exp(-(sqr(x - Lx / 2) + sqr(y-Ly/2)) / width))
+# f += CoefficientFunction(1e-1*exp(-(sqr(x - 3 * Lx / 4 + tParam * vf) + sqr(y-Ly/2)) / width))
+# for i in range(3):
+#     f += CoefficientFunction(1e-1*exp(-(sqr(x - i * Lx / 3 - tParam * vf) + sqr(y-Ly/2)) / width))
 # f = CoefficientFunction(IfPos((x-0.4)*(0.6-x), IfPos((y-0.4)*(0.6-y),3e-1,0),0))
-# width = 0.5
 # f = CoefficientFunction(3e-1*exp(-(sqr(x) + sqr(y-Ly/2)) / width))
 
 l = LinearForm(fes)
@@ -247,13 +272,9 @@ while tend < 0 or t < tend - tau / 2:
         fig.canvas.draw_idle()
         plt.pause(0.05)
 
-    # f = CoefficientFunction(1e-1*exp(-(sqr(x - t * vf) + sqr(y-Ly/2)) / width))
-
-    # l = LinearForm(fes)
-    # l += SymbolicLFI(f * tu)
-    # l += SymbolicLFI(kon * trho)
-
-    # l.Assemble()
+    for i in range(3):
+        tParam[i].Set((0.2 * t + i * 2) % 6)
+    l.Assemble()
     d.Assemble()
 
     rhs.data = b.mat * s.vec

@@ -29,8 +29,7 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
     p1y,p2y = min(p1y,p2y), max(p1y, p2y)
     if not bcs: bcs=4*[bc]
 
-    netmesh = NetMesh()
-    netmesh.dim = 2
+    netmesh = NetMesh(2)
 
     pnums = []
     for j in range(M + 1):

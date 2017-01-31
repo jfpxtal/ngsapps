@@ -12,6 +12,7 @@ namespace ngfem
     virtual ~ZLogZCoefficientFunction () {}
     ///
     virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
+    // void Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const;
   };
 }
 

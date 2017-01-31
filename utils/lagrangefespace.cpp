@@ -144,59 +144,52 @@ void LagrangeFESpace::GetDofNrs(ElementId ei, Array<int> &dnums) const
 
 
 // returns the reference element
-const FiniteElement &LagrangeFESpace::GetFE(int elnr, LocalHeap &lh) const
+FiniteElement &LagrangeFESpace::GetFE(ElementId ei, Allocator &lh) const
 {
-  if (ma->GetDimension() == 2)
+  Ngs_Element ngel = ma->GetElement(ei);
+  if (ei.IsVolume())
   {
-    LagrangeTrig * trig = new (lh) LagrangeTrig(order);
+    if (ma->GetDimension() == 2)
+    {
+      LagrangeTrig * trig = new (lh) LagrangeTrig(order);
 
-    Ngs_Element ngel = ma->GetElement (elnr);
+      for (int i = 0; i < 3; i++)
+        trig->SetVertexNumber (i, ngel.vertices[i]);
 
-    for (int i = 0; i < 3; i++)
-      trig->SetVertexNumber (i, ngel.vertices[i]);
+      return *trig;
+    }
+    else
+    {
+      LagrangeTet * tet = new (lh) LagrangeTet(order);
 
-    return *trig;
+      for (int i = 0; i < 4; i++)
+        tet->SetVertexNumber (i, ngel.vertices[i]);
+
+      return *tet;
+    }
   }
   else
   {
-    LagrangeTet * tet = new (lh) LagrangeTet(order);
+    if (ma->GetDimension() == 2)
+    {
+      LagrangeSegm * segm = new (lh) LagrangeSegm(order);
 
-    Ngs_Element ngel = ma->GetElement (elnr);
+      for (int i = 0; i < 2; i++)
+        segm->SetVertexNumber (i, ngel.vertices[i]);
 
-    for (int i = 0; i < 4; i++)
-      tet->SetVertexNumber (i, ngel.vertices[i]);
+      return *segm;
+    }
+    else
+    {
+      LagrangeTrig * trig = new (lh) LagrangeTrig(order);
 
-    return *tet;
+      for (int i = 0; i < 3; i++)
+        trig->SetVertexNumber (i, ngel.vertices[i]);
+
+      return *trig;
+    }
   }
 
-}
-
-
-// the same for the surface elements
-const FiniteElement & LagrangeFESpace::GetSFE (int elnr, LocalHeap &lh) const
-{
-  if (ma->GetDimension() == 2)
-  {
-    LagrangeSegm * segm = new (lh) LagrangeSegm(order);
-
-    Ngs_Element ngel = ma->GetSElement (elnr);
-
-    for (int i = 0; i < 2; i++)
-      segm->SetVertexNumber (i, ngel.vertices[i]);
-
-    return *segm;
-  }
-  else
-  {
-    LagrangeTrig * trig = new (lh) LagrangeTrig(order);
-
-    Ngs_Element ngel = ma->GetSElement (elnr);
-
-    for (int i = 0; i < 3; i++)
-      trig->SetVertexNumber (i, ngel.vertices[i]);
-
-    return *trig;
-  }
 }
 
 void LagrangeFESpace :: GetVertexDofNrs (int vnr, Array<int> & dnums) const

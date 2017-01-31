@@ -21,7 +21,7 @@ endif(NOT WIN32)
 
 if(USE_PYTHON)
     install (FILES
-            utils.py
+            utils.py meshtools.py merge_meshes.py
             DESTINATION ${PYTHON_PACKAGES_INSTALL_DIR}/ngsapps
             COMPONENT ngsapps
             )

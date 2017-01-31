@@ -13,7 +13,7 @@ maxh = 0.15
 
 # time step and end
 tau = 0.05
-tend = 25
+tend = -1
 
 ngsglobals.msg_level = 1
 
@@ -170,7 +170,7 @@ plt.show(block=False)
 
 input("")
 t = 0.0
-while t < tend:
+while tend < 0 or t < tend - tau / 2:
     a.Assemble()
     smat.AsVector().data = tau * a.mat.AsVector() + mmat.AsVector()
     rhs.data = mmat * s.vec + tau*f.vec
