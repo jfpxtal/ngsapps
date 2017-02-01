@@ -83,17 +83,17 @@ def transfer_elements(mesh_to, mesh_from, fd_index_offset=0, loc_offset=(0, 0, 0
     """Add all elements with vertices from mesh_from to mesh_to."""
     vertex_map = dict()
 
-    for elem in mesh_from.Elements1D():
-        pids = []
-        for vertex in elem.vertices:
-            if vertex not in vertex_map:
-                point = mesh_from[vertex]
-                vertex_map[vertex] = mesh_to.Add(MeshPoint(Pnt(point[0]+loc_offset[0],
-                                                               point[1]+loc_offset[1],
-                                                               point[2]+loc_offset[2])))
-            pids.append(vertex_map[vertex])
-        # not sure how face descriptors relate to 1D Elements
-        mesh_to.Add(Element1D(pids, index=elem.index + fd_index_offset))
+    # for elem in mesh_from.Elements1D():
+    #     pids = []
+    #     for vertex in elem.vertices:
+    #         if vertex not in vertex_map:
+    #             point = mesh_from[vertex]
+    #             vertex_map[vertex] = mesh_to.Add(MeshPoint(Pnt(point[0]+loc_offset[0],
+    #                                                            point[1]+loc_offset[1],
+    #                                                            point[2]+loc_offset[2])))
+    #         pids.append(vertex_map[vertex])
+    #     # not sure how face descriptors relate to 1D Elements
+    #     mesh_to.Add(Element1D(pids, index=elem.index + fd_index_offset))
 
     for elem in mesh_from.Elements2D():
         pids = []

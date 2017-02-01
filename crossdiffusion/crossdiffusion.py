@@ -1,40 +1,45 @@
 from netgen.geom2d import SplineGeometry
-import geometries
 from ngsolve import *
-import matplotlib.pyplot as plt
+
 from ngsapps.utils import *
 from ngsapps.merge_meshes import *
 from ngsapps.meshtools import *
-import numpy as np
-from netgen.meshing import Mesh as NgMesh
+
+import matplotlib.pyplot as plt
+
+import geometries
+from stationary import *
+from dgform import DGFormulation
+from cgform import CGFormulation
+
+form = CGFormulation()
+# form = DGFormulation()
 
 order = 3
 maxh = 0.3
 
 convOrder = 3
 
+p = CrossDiffParams()
+
 # diffusion coefficients
 # red species
-Dr = 0.1
+p.Dr = 0.1
 # blue species
-Db = 0.3
-
-def sqr(x):
-    return x*x
+p.Db = 0.3
 
 # advection potentials
-# gradVr = CoefficientFunction((1.0, 0.0))
-# gradVb = -gradVr
-Vr = -x+sqr(y-0.5)
-Vb = x+sqr(y-0.5)
+p.Vr = -x+sqr(y-0.5)
+p.Vb = x+sqr(y-0.5)
 
 # time step and end
 tau = 0.05
-# tau = 0.005
 tend = -1
 
 # jump penalty
-eta = 1000
+p.eta = 50
+
+conv = True
 
 # geometry and mesh
 geo = SplineGeometry()
@@ -45,7 +50,7 @@ for d in range(1, doms+1):
 # generate mesh on top geometry
 netmesh = geo.GenerateMesh(maxh=maxh)
 
-# now add a copy of the mesh, translated down by yoffset, for visualization of species blue
+# now add a copy of the mesh, translated by yoffset, for visualization of species blue
 yoffset = -1.3
 netmesh = merge_meshes(netmesh, netmesh, offset2=(0, yoffset, 0), transfer_mats2=False)
 for d in range(doms+1, nr_materials(netmesh)+1):
@@ -54,18 +59,14 @@ for d in range(doms+1, nr_materials(netmesh)+1):
 mesh = Mesh(netmesh)
 topMat = mesh.Materials('top')
 
-# finite element space
-fes1 = L2(mesh, order=order, flags={'definedon': ['top']})
-# calculations only on top rectangle
-fes = FESpace([fes1, fes1], flags={'definedon': ['top'], 'dgjumps': True})
-
+fes1, fes = form.FESpace(mesh, order)
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
 
 # initial values
-s = GridFunction(fes)
-r2 = s.components[0]
-b2 = s.components[1]
+p.s = GridFunction(fes)
+r2 = p.s.components[0]
+b2 = p.s.components[1]
 # r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0))
 # b2.Set(IfPos(x-1.8, 0.6, 0))
 r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
@@ -73,85 +74,28 @@ b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
 
-# convolution
-thin = 200
-k0 = 20
-K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-convr = ParameterLF(fes1.TestFunction()*K, r2, convOrder)
-convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
+if conv:
+    # convolution
+    thin = 200
+    k0 = 20
+    K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+    convr = ParameterLF(fes1.TestFunction()*K, r2, convOrder)
+    convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
+else:
+    convr = 0
+    convb = 0
 
 # GridFunctions for caching of convolution values and automatic gradient calculation
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
 with TaskManager():
-    gridr.Set(Vr-0*convr)
-    gridb.Set(Vb-0*convb)
-velocityr = -(1-r2-b2)*grad(gridr)
-velocityb = -(1-r2-b2)*grad(gridb)
+    gridr.Set(p.Vr-convr)
+    gridb.Set(p.Vb-convb)
+velocities = (-(1-r2-b2)*grad(gridr),
+              -(1-r2-b2)*grad(gridb))
 
-# special values for DG
-n = specialcf.normal(mesh.dim)
-h = specialcf.mesh_size
-
-a = BilinearForm(fes)
-
-# symmetric weighted interior penalty method
-# for the diffusion terms
-
-# weights for the averages
-# doesn't work, GridFunction doesn't support .Other() ??
-# wr = r2*r2.Other() / (r2+r2.Other())
-# wb = b2*b2.Other() / (b2+b2.Other())
-wr = wb = 0.5
-
-# equation for r
-a += SymbolicBFI(Dr*grad(r)*grad(tr))
-a += SymbolicBFI(-Dr*0.5*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*0.5*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(Dr*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
-
-a += SymbolicBFI(-Dr*b2*grad(r)*grad(tr))
-a += SymbolicBFI(Dr*wb*(grad(r) + grad(r.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(Dr*wb*(grad(tr) + grad(tr.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*2*wb*eta / h * (r - r.Other()) * (tr - tr.Other()), skeleton=True)
-
-a += SymbolicBFI(Dr*r2*grad(b)*grad(tr))
-a += SymbolicBFI(-Dr*wr*(grad(b) + grad(b.Other())) * n * (tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(-Dr*wr*(grad(tr)+grad(tr.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(Dr*2*wr*eta / h * (b - b.Other()) * (tr - tr.Other()), skeleton=True)
-
-# equation for b
-a += SymbolicBFI(Db*grad(b)*grad(tb))
-a += SymbolicBFI(-Db*0.5*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(-Db*0.5*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(Db*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
-
-a += SymbolicBFI(-Db*r2*grad(b)*grad(tb))
-a += SymbolicBFI(Db*wr*(grad(b) + grad(b.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(Db*wr*(grad(tb) + grad(tb.Other())) * n * (b - b.Other()), skeleton=True)
-a += SymbolicBFI(-Db*2*wr*eta / h * (b - b.Other()) * (tb - tb.Other()), skeleton=True)
-
-a += SymbolicBFI(Db*b2*grad(r)*grad(tb))
-a += SymbolicBFI(-Db*wb*(grad(r) + grad(r.Other())) * n * (tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(-Db*wb*(grad(tb) + grad(tb.Other())) * n * (r - r.Other()), skeleton=True)
-a += SymbolicBFI(Db*2*wb*eta / h * (r - r.Other()) * (tb - tb.Other()), skeleton=True)
-
-def abs(x):
-    return IfPos(x, x, -x)
-
-# upwind scheme for the advection
-# missing boundary term??
-
-# equation for r
-a += SymbolicBFI(-r*velocityr*grad(tr))
-a += SymbolicBFI(velocityr*n*0.5*(r + r.Other())*(tr - tr.Other()), skeleton=True)
-a += SymbolicBFI(0.5*abs(velocityr*n) * (r - r.Other())*(tr - tr.Other()), skeleton=True)
-
-# equation for b
-a += SymbolicBFI(-b*velocityb*grad(tb))
-a += SymbolicBFI(velocityb*n*0.5*(b + b.Other())*(tb - tb.Other()), skeleton=True)
-a += SymbolicBFI(0.5*abs(velocityb*n) * (b - b.Other())*(tb - tb.Other()), skeleton=True)
+a = form.BilinearForm(p, velocities)
 
 # mass matrix
 m = BilinearForm(fes)
@@ -161,63 +105,13 @@ m += SymbolicBFI(b*tb)
 print('Assembling m...')
 m.Assemble()
 
-# Calculate constant equilibria
-domainSize = Integrate(CoefficientFunction(1),mesh,definedon=topMat)
-mr = Integrate(r2,mesh, definedon=topMat)
-mb = Integrate(b2,mesh, definedon=topMat)
-
-rbinfty = GridFunction(fes)
+rbinfty = stationarySols(p, fes, topMat)
 rinfty = rbinfty.components[0]
 binfty = rbinfty.components[1]
 
-#rinfty = Integrate(r2,mesh, definedon=topMat) / domainSize
-#binfty = Integrate(b2,mesh, definedon=topMat) / domainSize 
 
-#### TODO: Add diffusion coeffs
-
-# Newton Solver to determine stationary solutions
-def AApply(uv,V,W,mesh):
-    mmr = Integrate( exp((uv[0]-V)/Dr) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
-    mmb = Integrate( exp((uv[1]-W)/Db) / (1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)), mesh, definedon=topMat )
-    # print(np.hstack((mmr, mmb)))
-    return (np.hstack((mmr, mmb)))
-
-def AssembleLinearization(uv,V,W,mesh):
-    m = np.empty([2,2])
-    m[0,0] = Integrate(exp((uv[0]-V)/Dr)*(1+exp((uv[1]-W)/Db))/(sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Dr),mesh,definedon=topMat)
-    m[0,1] = Integrate(-1/Db*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)),mesh,definedon=topMat)
-
-    m[1,0] = Integrate(-1/Dr*exp((uv[0]-V)/Dr)*exp((uv[1]-W)/Db)/sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db)),mesh,definedon=topMat)
-    m[1,1] = Integrate(exp((uv[1]-W)/Db)*(1+exp((uv[0]-V)/Dr))/(sqr(1+exp((uv[0]-V)/Dr)+exp((uv[1]-W)/Db))*Db),mesh,definedon=topMat)
-
-    # print(m)
-    return m
-
-updnorm = 1e99
-#uinfty = 1
-#vinfty = 1
-uvinfty = np.hstack((0.0,0.0))
-# Newton solver
-print('Start Newton...')
-with TaskManager():
-    while updnorm > 1e-9:
-        rhs = AApply(uvinfty,Vr,Vb,mesh) - np.hstack((mr, mb))
-        Alin = AssembleLinearization(uvinfty,Vr,Vb,mesh)
-    #    urgh
-        upd = np.linalg.solve(Alin, rhs)
-
-        updnorm = np.linalg.norm(upd)
-
-        uvinfty = uvinfty - 0.1*upd
-        # input('')
-
-print('Newton converged with error' + '|w| = {:7.3e} '.format(updnorm),end='\n')
-rinfty.Set(exp((uvinfty[0]-gridr)/Dr) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
-binfty.Set(exp((uvinfty[1]-gridb)/Db) / (1+exp((uvinfty[0]-gridr)/Dr)+exp((uvinfty[1]-gridb)/Db)))
-
-rhs = s.vec.CreateVector()
+rhs = p.s.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
-
 
 # Draw(r2, mesh, 'r')
 # Draw(b2, mesh, 'b')
@@ -226,7 +120,7 @@ mstar = m.mat.CreateMatrix()
 both = r2 + Compose((x, y-yoffset), b2, mesh)
 both2 = rinfty + Compose((x, y-yoffset), binfty, mesh)
 Draw(both2, mesh, 'stationary')
-Draw(both, mesh, 'both')
+Draw(both, mesh, 'dynamic')
 
 
 times = [0.0]
@@ -244,17 +138,18 @@ with TaskManager():
         print("\nt = {:10.6e}".format(t))
         t += tau
 
-        # print('Calculating convolution integrals...')
-        # gridr.Set(Vr-convr)
-        # gridb.Set(Vb-convb)
+        if conv:
+            print('Calculating convolution integrals...')
+            gridr.Set(p.Vr-convr)
+            gridb.Set(p.Vb-convb)
         print('Assembling a...')
         a.Assemble()
 
-        rhs.data = m.mat * s.vec
+        rhs.data = m.mat * p.s.vec
 
         mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
         invmat = mstar.Inverse(fes.FreeDofs())
-        s.vec.data = invmat * rhs
+        p.s.vec.data = invmat * rhs
 
         Redraw(blocking=False)
         times.append(t)

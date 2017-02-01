@@ -9,6 +9,9 @@ xPar = ParameterLFProxy(0)
 yPar = ParameterLFProxy(1)
 zPar = ParameterLFProxy(2)
 
+def sqr(x):
+    return x*x
+
 def Lagrange(mesh, **args):
     """
     Create H1 finite element space with Lagrange basis.
