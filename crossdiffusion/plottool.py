@@ -17,7 +17,6 @@ grid = []
 grid.append([1, 2, 3])
 grid.append([i*0.02 for i in range(3, 14)])
 grid.append([20, 25, 30, 50, 100, 200, 1000])
-print(grid)
 
 sliders = []
 sliders.append(Slider(ax_order, 'order', 1, 3, 1, valfmt='%0.0f'))
@@ -31,8 +30,6 @@ cb_form = CheckButtons(ax_form, ['DG'], [DG])
 
 vals = []
 def update_plot(_=None):
-    print('hey')
-    print(conv)
     global conv, DG, vals
     oldconv = conv
     oldvals = vals
@@ -41,10 +38,8 @@ def update_plot(_=None):
     # print([bisect.bisect_right(grid[i], vals[i]) for i in range(3)])
     vals = [grid[i][bisect.bisect_right(grid[i], vals[i])-1] for i in range(3)]
     conv = cb_conv.lines[0][0].get_visible()
-    print(conv)
     DG = cb_form.lines[0][0].get_visible()
     if conv == oldconv and DG == oldDG and vals == oldvals:
-        print('ret')
         return
 
     fname = '../data/crossdiff/topf/order' + str(vals[0]) + '_maxh' + str(vals[1])
