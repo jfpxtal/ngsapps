@@ -20,3 +20,6 @@ class CGFormulation(Formulation):
         self.a += SymbolicBFI(p.Dr*(1-b2)*grad(r)*grad(tr) + p.Dr*r2*grad(b)*grad(tr) - r*(1-r2-b2)*velor*grad(tr))
         self.a += SymbolicBFI(p.Db*(1-r2)*grad(b)*grad(tb) + p.Db*b2*grad(r)*grad(tb) - b*(1-r2-b2)*velob*grad(tb))
         return self.a
+
+    def __str__(self):
+        return 'CG'

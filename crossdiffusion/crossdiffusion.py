@@ -12,8 +12,6 @@ from stationary import *
 from dgform import DGFormulation
 from cgform import CGFormulation
 
-form = CGFormulation()
-# form = DGFormulation()
 
 order = 3
 maxh = 0.3
@@ -37,7 +35,10 @@ tau = 0.05
 tend = -1
 
 # jump penalty
-p.eta = 50
+eta = 50
+
+form = CGFormulation()
+# form = DGFormulation(eta)
 
 conv = True
 
@@ -92,8 +93,8 @@ gridb = grid.components[1]
 with TaskManager():
     gridr.Set(p.Vr-convr)
     gridb.Set(p.Vb-convb)
-velocities = (-(1-r2-b2)*grad(gridr),
-              -(1-r2-b2)*grad(gridb))
+velocities = (-grad(gridr),
+              -grad(gridb))
 
 a = form.BilinearForm(p, velocities)
 

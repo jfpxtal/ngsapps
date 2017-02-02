@@ -4,14 +4,12 @@ from ngsapps.utils import *
 import numpy as np
 
 class CrossDiffParams:
-    pass
-    # def __init__(self, rinit=None, binit=None, Dr=None, Db=None, Vr=None, Vb=None):
-    #     self.rinit = rinit
-    #     self.binit = binit
-    #     self.Dr = Dr
-    #     self.Db = Db
-    #     self.Vr = Vr
-    #     self.Vb = Vb
+    def __init__(self, s=None, Dr=None, Db=None, Vr=None, Vb=None):
+        self.s = s
+        self.Dr = Dr
+        self.Db = Db
+        self.Vr = Vr
+        self.Vb = Vb
 
 def AApply(uv, p, mesh, mat):
     mmr = Integrate(exp((uv[0]-p.Vr)/p.Dr) / (1+exp((uv[0]-p.Vr)/p.Dr)+exp((uv[1]-p.Vb)/p.Db)), mesh, definedon=mat)
