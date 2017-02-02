@@ -16,9 +16,11 @@ orders = [1, 2, 3]
 maxhs = [i*0.02 for i in range(3, 14)]
 etas = [20, 25, 30, 50, 100, 200, 1000]
 forms = [CGFormulation()] + [DGFormulation(eta) for eta in etas]
-convs = [False, True]
+convs = [True]
 
 p = CrossDiffParams()
+
+convOrder = 3
 
 # diffusion coefficients
 # red species
@@ -29,8 +31,6 @@ p.Db = 0.3
 # advection potentials
 p.Vr = -x+sqr(y-0.5)
 p.Vb = x+sqr(y-0.5)
-
-conv = False
 
 # time step and end
 tau = 0.05
@@ -112,6 +112,8 @@ for conv, order, maxh, form in product(convs, orders, maxhs, forms):
     l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
     l2b = Integrate(sqr(binfty-b2), mesh, definedon=topMat)
     outfile.write('{}, {}, {}, {}\n'.format(0.0, ent, l2r, l2b))
+    # Draw(r2, mesh, 'r2')
+    # Draw(convr, mesh, 'convr')
 
     # semi-implicit Euler
     t = 0.0
