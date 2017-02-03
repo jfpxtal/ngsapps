@@ -6,12 +6,14 @@ import matplotlib
 # Make sure that we are using QT5
 matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import Qt, QPoint, QSize
 from PyQt5.QtGui import QPainter, QStaticText
 from PyQt5.QtWidgets import *
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanvas,
+                                                NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
+from matplotlib.widgets import Cursor
 from itertools import product
 
 progname = os.path.basename(sys.argv[0])
@@ -32,7 +34,7 @@ class MyMplCanvas(FigureCanvas):
 
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        fig.subplots_adjust(left=0.05, right = 0.95)
+        fig.subplots_adjust(left=0.05, right = 0.975)
         self.axes = fig.add_subplot(111)
 
         FigureCanvas.__init__(self, fig)
@@ -44,39 +46,40 @@ class MyMplCanvas(FigureCanvas):
         FigureCanvas.updateGeometry(self)
 
 
-class TickLabelSlider(QWidget):
+class TickLabelSlider(QSlider):
     def __init__(self, labels):
-        super().__init__()
+        super().__init__(Qt.Horizontal)
         self.labels = labels
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(1, len(labels))
-        self.slider.setTickInterval(1)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        vlay = QVBoxLayout(self)
-        vlay.setContentsMargins(0, self.fontMetrics().height()-8, 0, 0)
-        vlay.addWidget(self.slider)
+        self.setRange(1, len(labels))
+        self.setTickInterval(1)
+        # self.setTickPosition(QSlider.TicksAbove)
 
     def paintEvent(self, e):
         p = QPainter(self)
-        sty = self.slider.style()
         opt = QStyleOptionSlider()
-        self.slider.initStyleOption(opt)
+        self.initStyleOption(opt)
         p.translate(opt.rect.x(), opt.rect.y())
         p.setPen(opt.palette.windowText().color())
         # tickOffset = sty.pixelMetric(QStyle.PM_SliderTickmarkOffset, opt, self.slider)
-        available = sty.pixelMetric(QStyle.PM_SliderSpaceAvailable, opt, self.slider)
-        slen = sty.pixelMetric(QStyle.PM_SliderLength, opt, self.slider)
+        available = self.style().pixelMetric(QStyle.PM_SliderSpaceAvailable, opt, self)
+        slen = self.style().pixelMetric(QStyle.PM_SliderLength, opt, self)
         fudge = slen / 2
         for i in range(len(self.labels)):
             v = opt.minimum + i
-            pos = sty.sliderPositionFromValue(opt.minimum, opt.maximum, v, available) + fudge
+            pos = self.style().sliderPositionFromValue(opt.minimum, opt.maximum, v, available) + fudge
             # p.drawLine(pos, 0, pos, tickOffset - 2)
-            # p.drawStaticText(pos, 0, QStaticText(str(i+1)))
-            # p.drawText(pos, 0, str(i+1))
             br = p.fontMetrics().boundingRect(self.labels[i])
-            # p.drawText(QPoint(pos - br.width()/2, p.fontMetrics().ascent()-2), str(i+1))
-            pos = min(max(pos, br.width()/2), available+3-br.width()/2)
+            pos = min(max(pos, br.width()/2), available+fudge-br.width()/2)
             p.drawStaticText(pos - br.width()/2, 0, QStaticText(self.labels[i]))
+
+        super().paintEvent(e)
+
+    def sizeHint(self):
+        self.ensurePolished()
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        thick = self.style().pixelMetric(QStyle.PM_SliderThickness, opt, self)
+        return QSize(84, thick+self.fontMetrics().height())
 
 
 
@@ -97,42 +100,50 @@ class ApplicationWindow(QMainWindow):
 
         vlayout = QVBoxLayout(self.main_widget)
         self.dc = MyMplCanvas(self.main_widget, width=5, height=4, dpi=100)
+        navtool = NavigationToolbar(self.dc, self)
+        navtool.setMovable(True)
+        self.addToolBar(navtool)
+
         vlayout.addWidget(self.dc, 10)
-        group = QGroupBox()
-        vlayout.addWidget(group, 3)
-        grid = QGridLayout(group)
+
+        grid = QGridLayout()
         self.sOrder = TickLabelSlider([str(i) for i in valGrid[0]])
         self.sMaxH = TickLabelSlider([str(i) for i in valGrid[1]])
         self.sEta = TickLabelSlider([str(i) for i in valGrid[2]])
         self.sliders = [self.sOrder, self.sMaxH, self.sEta]
-        grid.addWidget(self.sOrder, 0, 1, 1, 8)
-        grid.addWidget(self.sMaxH, 1, 1, 1, 8)
-        grid.addWidget(self.sEta, 2, 3, 1, 6)
+        grid.addWidget(self.sOrder, 1, 2, 1, 2)
+        grid.addWidget(self.sMaxH, 2, 2, 1, 2)
+        grid.addWidget(self.sEta, 3, 2, 1, 2)
         for s in self.sliders:
-            s.slider.valueChanged.connect(self.updatePlot)
+            s.valueChanged.connect(self.updatePlot)
+        vlayout.addLayout(grid, 3)
 
         self.cbConv = QCheckBox('Conv')
         self.cbDG = QCheckBox('DG')
+        self.cbConv.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.cbDG.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.cbConv.setChecked(False)
         self.cbDG.setChecked(True)
         grid.addWidget(self.cbConv, 2, 0,)
-        grid.addWidget(self.cbDG, 2, 1)
+        grid.addWidget(self.cbDG, 3, 0)
         self.cbConv.toggled.connect(self.updatePlot)
         self.cbDG.toggled.connect(self.updatePlot)
 
         self.cbSimul = []
         for i in range(3):
             cb = QCheckBox()
-            grid.addWidget(cb, i, 9)
+            # cb.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            grid.addWidget(cb, 1+i, 4)
             cb.toggled.connect(self.updatePlot)
             self.cbSimul.append(cb)
+        lblSimul = QLabel('all')
+        lblSimul.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        grid.addWidget(lblSimul, 0, 4)
 
-        l0 = QLabel(params[0])
-        l1 = QLabel(params[1])
-        l2 = QLabel(params[2])
-        grid.addWidget(l0, 0, 0)
-        grid.addWidget(l1, 1, 0)
-        grid.addWidget(l2, 2, 2)
+        for i in range(3):
+            lbl = QLabel(params[i])
+            lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            grid.addWidget(lbl, 1+i, 1)
 
         self.iType = 0
 
@@ -142,14 +153,16 @@ class ApplicationWindow(QMainWindow):
         self.updatePlot()
 
     def updatePlot(self):
-        vals = [valGrid[i][self.sliders[i].slider.value()-1] for i in range(len(self.sliders))]
+        vals = [valGrid[i][self.sliders[i].value()-1] for i in range(len(self.sliders))]
         conv = self.cbConv.isChecked()
         DG = self.cbDG.isChecked()
 
         prodList = []
+        haveSimul = False
         for i in range(3):
             if self.cbSimul[i].isChecked():
                 prodList.append(valGrid[i])
+                haveSimul = True
             else:
                 prodList.append([vals[i]])
 
@@ -177,10 +190,12 @@ class ApplicationWindow(QMainWindow):
                                   label=', '.join([params[i]+'='+str(prodVals[i]) for i in range(3)
                                              if self.cbSimul[i].isChecked()]))
                 self.statusBar().showMessage(fname)
-                self.dc.axes.legend()
+                if haveSimul:
+                    self.dc.axes.legend()
             except FileNotFoundError:
                 self.statusBar().showMessage(fname + ' not found')
 
+        self.dc.cursor = Cursor(self.dc.axes, useblit=True, linewidth=0.5, color='k')
         self.dc.draw()
 
     def typeEntropy(self):
