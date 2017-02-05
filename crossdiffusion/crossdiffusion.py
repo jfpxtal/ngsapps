@@ -35,12 +35,12 @@ tau = 0.05
 tend = -1
 
 # jump penalty
-eta = 50
+eta = 15
 
-form = CGFormulation()
-# form = DGFormulation(eta)
+# form = CGFormulation()
+form = DGFormulation(eta)
 
-conv = True
+conv = False
 
 # geometry and mesh
 geo = SplineGeometry()
@@ -131,6 +131,9 @@ fig, ax = plt.subplots()
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
+outfile = open('order{}_maxh{}_form{}_conv{}.csv'.format(order, maxh, form, conv), 'w')
+outfile.write('time, entropy, l2sq_to_equi_r, l2sq_to_equi_b\n')
+
 # input("Press any key...")
 # semi-implicit Euler
 t = 0.0
@@ -153,17 +156,22 @@ with TaskManager():
         p.s.vec.data = invmat * rhs
 
         Redraw(blocking=False)
+
+        ent = Integrate(entropy, mesh, definedon=topMat)
+        l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
+        l2b = Integrate(sqr(binfty-b2), mesh, definedon=topMat)
+        outfile.write('{}, {}, {}, {}\n'.format(t, ent, l2r, l2b))
+        outfile.flush()
+
         times.append(t)
-        ents.append(Integrate(entropy, mesh, definedon=topMat))
+        ents.append(ent)
         line.set_xdata(times)
         line.set_ydata(ents)
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
+
         # input()
 
-outfile = open('ents_dg.csv','w')
-for item in ents:
-    outfile.write("%s\n" % item)
 outfile.close()
 
