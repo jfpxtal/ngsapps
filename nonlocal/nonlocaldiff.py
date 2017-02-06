@@ -11,7 +11,7 @@ import numpy as np
 
 order = 2
 conv_order = 3
-maxh = 0.2
+maxh = 0.4
 
 # time step and end
 tau = 0.01

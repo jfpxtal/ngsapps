@@ -49,6 +49,8 @@ u = GridFunction(fes)
 
 u_exact = exp(1J*k*(d[0] * x + d[1] * y + d[2] * z))
 
+Draw(u, mesh, 'sol')
+
 with TaskManager():
     a.Assemble()
     f.Assemble()
