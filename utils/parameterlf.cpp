@@ -4,6 +4,57 @@
 
 namespace ngfem
 {
+
+  PeriodicCompactlySupportedKernel::PeriodicCompactlySupportedKernel(double adx, double ady, double aradius, double ascale)
+    : CoefficientFunction(1, false), dx(adx), dy(ady), radius(aradius), scale(ascale)
+  {}
+
+  double PeriodicCompactlySupportedKernel::Evaluate (const BaseMappedIntegrationPoint & ip) const
+  {
+    const auto &p = ip.GetPoint();
+    const auto &paramCoords = static_cast<ParameterLFUserData*>(ip.GetTransformation().userdata)->paramCoords;
+    double res = 0.0;
+    for (int i : {-1, 0, 1})
+    {
+      for (int j : {-1, 0, 1})
+      {
+        auto x = p[0] - paramCoords[0] + i*dx;
+        auto y = p[1] - paramCoords[1] + j*dy;
+        double d =  1 - sqrt(x*x+y*y)/radius;
+        if (d > 0) res += d;
+      }
+    }
+    return scale*res;
+  }
+
+  void PeriodicCompactlySupportedKernel::Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
+  {
+    const auto &ps = ir.GetPoints();
+    const auto &paramCoords = static_cast<ParameterLFUserData*>(ir.GetTransformation().userdata)->paramCoords;
+    for (int k = 0; k < ir.Size(); k++)
+    {
+      values(0, k) = 0.0;
+      for (int i : {-1, 0, 1})
+      {
+        for (int j : {-1, 0, 1})
+        {
+          // cout << "i " << i << " " << j << " " << endl;
+          // cout << ps.Get(k, 0) << endl << paramCoords[0] << endl << i*dx << endl << endl;
+          // cout << ps.Get(k, 1) << endl << paramCoords[1] << endl << j*dy << endl << endl;
+          auto x = ps.Get(k, 0) - paramCoords[0] + i*dx;
+          // cout << "x " << x << endl << endl;
+          auto y = ps.Get(k, 1) - paramCoords[1] + j*dy;
+          // cout << "y " << y << endl << endl;
+          auto d =  FMA(-1/radius, sqrt(x*x+y*y), 1);
+          // cout << d << endl << endl;
+          // values(0, k) += scale*ngstd::IfPos(d, d, 0);
+          values(0, k) = FMA(scale, ngstd::IfPos(d, d, 0), values(0, k));
+          // cout << values(0, k) << endl << endl << endl;
+        }
+      }
+    }
+  }
+
   ParameterLinearFormCF::ParameterLinearFormCF (shared_ptr<CoefficientFunction> aintegrand,
                                                                   shared_ptr<ngcomp::GridFunction> agf,
                                                                   int aorder)
@@ -62,7 +113,7 @@ namespace ngfem
       readLock.unlock();
       unique_lock<shared_timed_mutex> writeLock(lutElEntry.second);
       // check again?
-      auto lh = LocalHeap(100000, "parameterlf lh", true);
+      auto lh = LocalHeap(100000, "parameterlf lh");
       //cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << endl << endl << endl;
       //cout << "ir " << ir.IR() << endl << endl;
       auto fes = gf->GetFESpace();
@@ -86,7 +137,8 @@ namespace ngfem
         //cout << "fel order" << el.GetFE().Order() << endl << endl;
         //cout << "myIR " << myIR << endl << endl;
         auto & myMIR = trafo(myIR, lh);
-        int elvec_size = el.GetFE().GetNDof()*fes->GetDimension();
+        auto & fel = el.GetFE();
+        int elvec_size = fel.GetNDof()*fes->GetDimension();
         //cout << "elvec_size " << elvec_size << endl << endl;
         FlatVector<double> elvec(elvec_size, lh);
         FlatVector<double> elvec1(elvec_size, lh);
@@ -118,7 +170,7 @@ namespace ngfem
             }
             //cout << "proxvals " << proxyvalues << endl << endl;
 
-            proxy->Evaluator()->ApplyTrans(el.GetFE(), myMIR, proxyvalues, elvec1, lh);
+            proxy->Evaluator()->ApplyTrans(fel, myMIR, proxyvalues, elvec1, lh);
             //cout << "elv1 " << elvec1 << endl << endl;
             elvec += elvec1;
           }
@@ -135,6 +187,8 @@ namespace ngfem
       values = it->second * gf->GetVector().FVDouble();
       //cout << "res " << values << endl << endl;
     } else {
+      // cout << "mat " << it->second << endl << endl;
+      // cout << "gf vec " << gf->GetVector().FVDouble() << endl << endl;
       values = it->second * gf->GetVector().FVDouble();
     }
   }
@@ -154,7 +208,7 @@ namespace ngfem
       readLock.unlock();
       unique_lock<shared_timed_mutex> writeLock(lutElEntry.second);
       // check again?
-      auto lh = LocalHeap(100000, "parameterlf lh", true);
+      auto lh = LocalHeap(100000, "parameterlf lh");
       //cout << ir.IR() << endl << endl;
       //cout << ir << endl << endl;
       auto fes = gf->GetFESpace();
@@ -175,7 +229,8 @@ namespace ngfem
         SIMD_IntegrationRule myIR(el.GetType(), order);
         //cout << "myIR " << myIR << endl << endl;
         auto & myMIR = trafo(myIR, lh);
-        int elvec_size = el.GetFE().GetNDof()*fes->GetDimension();
+        auto & fel = el.GetFE();
+        int elvec_size = fel.GetNDof()*fes->GetDimension();
         FlatVector<double> elvec(elvec_size, lh);
         auto dnums = el.GetDofs();
         for (auto j : Range(ir.Size()))
@@ -199,7 +254,7 @@ namespace ngfem
                   proxyvalues(k,i) *= myMIR[i].GetWeight();
               }
 
-              proxy->Evaluator()->AddTrans(el.GetFE(), myMIR, proxyvalues, elvec);
+              proxy->Evaluator()->AddTrans(fel, myMIR, proxyvalues, elvec);
             }
 
             fes->TransformVec(el, elvec, ngcomp::TRANSFORM_RHS);

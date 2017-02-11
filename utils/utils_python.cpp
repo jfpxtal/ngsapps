@@ -49,8 +49,9 @@ void ExportNgsAppsUtils(py::module &m)
           [] (PyComposeCF *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma)
           {
             new (instance) PyComposeCF(make_shared<ComposeCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma));
-          })
-    ;
+          },
+          py::arg("innercf"), py::arg("outercf"), py::arg("mesh")
+      );
 
   typedef PyWrapperDerived<ParameterLFProxy, CoefficientFunction> PyParameterLFProxy;
   py::class_<PyParameterLFProxy,PyCF>
@@ -61,6 +62,17 @@ void ExportNgsAppsUtils(py::module &m)
            new (instance) PyParameterLFProxy(make_shared<ParameterLFProxy>(direction));
          })
     ;
+
+  typedef PyWrapperDerived<PeriodicCompactlySupportedKernel, CoefficientFunction> PyPeriodicCompactlySupportedKernel;
+  py::class_<PyPeriodicCompactlySupportedKernel,PyCF>
+    (m, "PeriodicCompactlySupportedKernel", "")
+    .def("__init__",
+         [](PyPeriodicCompactlySupportedKernel *instance, double dx, double dy, double radius, double scale)
+         {
+           new (instance) PyPeriodicCompactlySupportedKernel(make_shared<PeriodicCompactlySupportedKernel>(dx, dy, radius, scale));
+         },
+         py::arg("dx"), py::arg("dy"), py::arg("radius"), py::arg("scale")=1.0
+      );
 
   typedef PyWrapper<ngcomp::GridFunction> PyGF;
   typedef PyWrapperDerived<ParameterLinearFormCF, CoefficientFunction> PyParameterLF;

@@ -8,11 +8,11 @@ namespace ngfem
     shared_ptr<CoefficientFunction> c1;
     shared_ptr<CoefficientFunction> c2;
     shared_ptr<ngcomp::MeshAccess> ma;
+
   public:
     ComposeCoefficientFunction (shared_ptr<CoefficientFunction> ac1,
                               shared_ptr<CoefficientFunction> ac2,
                                 shared_ptr<ngcomp::MeshAccess> ama);
-    virtual ~ComposeCoefficientFunction ();
     ///
     virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
     virtual double EvaluateConst () const;

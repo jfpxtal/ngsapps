@@ -30,6 +30,18 @@ namespace ngfem
     }
   };
 
+  // too slow in python:
+  class PeriodicCompactlySupportedKernel : public CoefficientFunction
+  {
+    double dx, dy, radius, scale;
+
+  public:
+    PeriodicCompactlySupportedKernel(double adx, double ady, double aradius, double ascale);
+    virtual double Evaluate (const BaseMappedIntegrationPoint & ip) const;
+    virtual void Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const;
+  };
+
+
   class ParameterLinearFormCF : public CoefficientFunction
   {
     shared_ptr<CoefficientFunction> integrand;

@@ -24,14 +24,6 @@ ngsglobals.msg_level = 1
 # diffusion coefficient
 D = 1
 
-# Convolution kernel
-thin = 1
-k0 = 1
-def sqr(x):
-    return x*x
-#K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-K = IfPos(0.1-sqrt(sqr(x)+sqr(y)), 0.1-sqrt(sqr(x)+sqr(y)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-
 vtkoutput = False
 
 geo = SplineGeometry()
@@ -39,6 +31,8 @@ xmin = -2
 xmax = 2
 ymin = -1
 ymax = 2
+dx = xmax - xmin
+dy = ymax - ymin
 pnts = [(xmin,ymin),(xmax,ymin),(xmax,ymax),(xmin,ymax)]
 lines = [ (0,1,1,"bottom"), (1,2,2,"right"), (2,3,3,"top"), (3,0,4,"left") ]
 pnums = [geo.AppendPoint(*p) for p in pnts]
@@ -47,6 +41,15 @@ lbot = geo.Append ( ["line", pnums[0], pnums[1]], bc="bottom")
 lright = geo.Append ( ["line", pnums[1], pnums[2]], bc="right")
 geo.Append ( ["line", pnums[0], pnums[3]], leftdomain=0, rightdomain=1, bc="left", copy=lright)
 geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top", copy=lbot)
+
+# Convolution kernel
+thin = 1
+k0 = 1
+def sqr(x):
+    return x*x
+#K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+# K = IfPos(0.1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0.1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+K = PeriodicCompactlySupportedKernel(dx, dy, radius=0.1, scale=1.0)
 
 #mesh = Mesh(mesh)
 
@@ -104,6 +107,7 @@ uold = v.vec.CreateVector()
 
 # visualize both species at the same time, red in top rectangle, blue in bottom
 # translate density b2 of blue species to bottom rectangle
+Draw(g, mesh, 'conv')
 Draw(s, mesh, 'rho')
 
 if vtkoutput:
@@ -125,7 +129,7 @@ with TaskManager():
         t += tau
         print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
         Redraw(blocking=False)
-        #input("")
+        # input("")
 
         if vtkoutput:
             vtk.Do()
