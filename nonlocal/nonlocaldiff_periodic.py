@@ -77,7 +77,10 @@ s = GridFunction(fes)
 b0 = 4
 b1 = 7
 sig = 25
-s.Set(b0*exp(-sig*(sqr(x-0.5)+sqr(y-0.5)))+b1*exp(-sig*(sqr(x+0.5)+sqr(y-0.5))))
+#s.Set(b0*exp(-sig*(sqr(x-0.5)+sqr(y-0.5)))+b1*exp(-sig*(sqr(x+0.5)+sqr(y-0.5))))
+s.Set(1 + 0.1*RandomCF(0.0,1.0))
+
+blub
 
 v = GridFunction (fes)
 
