@@ -1,7 +1,7 @@
 # Solve the equation
-# \rho_t = \nabla \cdot ( D*M(K\ast\rho) \rho)
+# \rho_t = \nabla \cdot ( M(K\ast\rho) \rho)
 # with homogeneous Neumman bcs and with
-# K(x) = exp(-x) and diff. coeff. D
+# K(x) = exp(-x) 
 
 from netgen.geom2d import unit_square
 from ngsolve import *
@@ -11,26 +11,24 @@ from netgen.csg import *
 import numpy as np
 from netgen.geom2d import SplineGeometry
 
+def sqr(x):
+    return x*x
+
+# FEM parameters
 order = 2
 conv_order = 3
 maxh = 0.17
 
-# time step and end
+# time step and final time
 tau = 0.005
 tend = 25
 
 ngsglobals.msg_level = 1
 
-# diffusion coefficient
-D = 1
-
 vtkoutput = False
 
 geo = SplineGeometry()
-xmin = -3
-xmax = 3
-ymin = -3
-ymax = 3
+xmin, xmax, ymin, ymax = -3, 3, -3 3
 dx = xmax - xmin
 dy = ymax - ymin
 pnts = [(xmin,ymin),(xmax,ymin),(xmax,ymax),(xmin,ymax)]
@@ -44,9 +42,6 @@ geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top"
 
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 
-def sqr(x):
-    return x*x
-
 # Convolution kernel
 thin = 10
 k0 = 1
@@ -57,71 +52,45 @@ Kint = Integrate(K2,mesh)
 K = (1/Kint)*k0*IfPos(1-(1/Kmax)*sqrt(sqr(x-xPar)+sqr(y-yPar)), 1-(1/Kmax)*sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 #K = CompactlySupportedKernel(radius=0.1, scale=1.0)
 
-#mesh = Mesh(mesh)
-
-#mesh = Mesh (unit_square.GenerateMesh(maxh=0.1))
-
-#geo = SplineGeometry()
-#geo.AddCircle ( (0.0, 0.0), r=5, bc="cyl")
-#geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
-
-#geo = CSGeometry()
-#geo.Add(Torus(Pnt(0,0,0),Vec(-1,0,0),0,1))
 
 # H1-conforming finite element space
 fes = Periodic(H1(mesh, order=order)) # Neumann only, dirichlet=[1,2,3,4])
-#fes = L2(mesh, order=4, flags={"dgjumps":True})
-
 u, w = fes.TrialFunction(), fes.TestFunction()
 
-# initial values
-s = GridFunction(fes)
-#s.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
-#s.Set(IfPos(RandomCF(0.0,1.0)+1,RandomCF(0.0,1.0)+1,0))
-b0 = 4
-b1 = 7
-sig = 25
-#s.Set(b0*exp(-sig*(sqr(x-0.5)+sqr(y-0.5)))+b1*exp(-sig*(sqr(x+0.5)+sqr(y-0.5))))
-s.Set(0.8 + 0.1*RandomCF(0.0,1.0))
-
-
 v = GridFunction (fes)
-
+g = GridFunction(fes)
 conv = ParameterLF(w*K, s, conv_order, repeat=1, patchSize=[dx, dy])
 
-# the bilinear-form
-g = GridFunction(fes)
+# bilinear-forms
 a1 = BilinearForm (fes, symmetric=False)
-a1 += SymbolicBFI ( D*(0*-exp(-g)*u*grad(g) + exp(-g)*grad(u) )*grad(w) )
 a2 = BilinearForm (fes, symmetric=False)
-a2 += SymbolicBFI ( D*(-exp(-g)*u*grad(g) + 0*exp(-g)*grad(u) )*grad(w) )
-#a += SymbolicBFI ( D*grad(u)*grad(w) ) # TEST: HEAT EQ
-#a += SymbolicBFI ( D*grad(exp(-g)*u)*grad(w) )
+
+a1 += SymbolicBFI ( (0*-exp(-g)*u*grad(g) +   exp(-g)*grad(u) )*grad(w) ) # Implicit
+a2 += SymbolicBFI ( (  -exp(-g)*u*grad(g) + 0*exp(-g)*grad(u) )*grad(w) ) # Explicit
 
 m = BilinearForm(fes)
 m += SymbolicBFI( u*w )
-
-f = LinearForm(fes)
-#f += SymbolicLFI ( alpha1*tr + alpha2*tb,BND,definedon=[1] )
-f.Assemble()
 
 m.Assemble()
 mmat = m.mat
 smat = mmat.CreateMatrix()
 
-# Calculate constant equilibria
-rhs = v.vec.CreateVector()
-uold = v.vec.CreateVector()
+# initial values
+s = GridFunction(fes)
+b0, b1 = 4, 7
+sig = 25
+#s.Set(b0*exp(-sig*(sqr(x-0.5)+sqr(y-0.5)))+b1*exp(-sig*(sqr(x+0.5)+sqr(y-0.5))))
+#s.Set(IfPos(RandomCF(0.0,1.0)+1,RandomCF(0.0,1.0)+1,0))
+s.Set(0.8 + 0.1*RandomCF(0.0,1.0))
 
-# visualize both species at the same time, red in top rectangle, blue in bottom
-# translate density b2 of blue species to bottom rectangle
-Draw(g, mesh, 'conv')
-Draw(s, mesh, 'rho')
+# Visualization
+Draw(g, mesh, 'K*rho') # K \ast \rho
+Draw(s, mesh, 'rho') # \rho
 
 if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[s],names=["rho"],filename="nonlocaldiffusion",subdivision=3)
     vtk.Do()
-#g.Set(1*x) #    conv)
+
 input("")
 t = 0.0
 with TaskManager():
@@ -129,16 +98,16 @@ with TaskManager():
         print("do convolution")
         g.Set(conv)
         print("...done\n")
+        
         a1.Assemble()
         a2.Assemble()
         smat.AsVector().data = mmat.AsVector() + tau * a1.mat.AsVector()
-        rhs.data = mmat * s.vec - tau * a2.mat * s.vec #+ tau*f.vec
+        rhs.data = mmat * s.vec - tau * a2.mat * s.vec
         s.vec.data = smat.Inverse(fes.FreeDofs()) * rhs
 
         t += tau
         print("\n mass = {:10.6e}".format(Integrate(s,mesh)) +  "t = {:10.6e}".format(t))
         Redraw(blocking=False)
-        # input("")
 
         if vtkoutput:
             vtk.Do()
