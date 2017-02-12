@@ -42,14 +42,15 @@ lright = geo.Append ( ["line", pnums[1], pnums[2]], bc="right")
 geo.Append ( ["line", pnums[0], pnums[3]], leftdomain=0, rightdomain=1, bc="left", copy=lright)
 geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top", copy=lbot)
 
-# Convolution kernel
-thin = 1
-k0 = 1
 def sqr(x):
     return x*x
-#K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+
+# Convolution kernel
+thin = 10
+k0 = 1
+K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 # K = IfPos(0.1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0.1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-K = PeriodicCompactlySupportedKernel(dx, dy, radius=0.1, scale=1.0)
+# K = CompactlySupportedKernel(radius=0.1, scale=1.0)
 
 #mesh = Mesh(mesh)
 
@@ -81,7 +82,7 @@ s.Set(b0*exp(-sig*(sqr(x-0.5)+sqr(y-0.5)))+b1*exp(-sig*(sqr(x+0.5)+sqr(y-0.5))))
 
 v = GridFunction (fes)
 
-conv = ParameterLF(w*K, s, conv_order)
+conv = ParameterLF(w*K, s, conv_order, repeat=1, patchSize=[dx, dy])
 
 # the bilinear-form
 g = GridFunction(fes)

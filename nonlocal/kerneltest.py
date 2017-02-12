@@ -11,7 +11,7 @@ maxh = 0.09
 # maxh = 0.15
 # maxh = 0.3
 
-ngsglobals.msg_level = 1
+ngsglobals.msg_level = 4
 
 def sqr(x):
     return x*x
@@ -42,17 +42,31 @@ lright = geo.Append ( ["line", pnums[1], pnums[2]], bc="right")
 geo.Append ( ["line", pnums[0], pnums[3]], leftdomain=0, rightdomain=1, bc="left", copy=lright)
 geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top", copy=lbot)
 
+# pyK = CoefficientFunction(0.0)
+# xcenter, ycenter = -1.9, 1.5
+# radius = 0.3
+# scale = 1.0
+# for i in range(-1, 2):
+#     for j in range(-1, 2):
+#         pyK += scale * posPart(1 - norm(x-xcenter+i*dx, y-ycenter+j*dy)/radius)
+
 
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
-K = PeriodicCompactlySupportedKernel(dx, dy, 1)
+# K = CompactlySupportedKernel(1)
+# K = IfPos(1-sqrt(pow(x-xPar, 2)+sqr(y-yPar)), 1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+# K = IfPos(1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+thin = 1
+k0 = 1
+K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 
 # H1-conforming finite element space
 fes = Periodic(H1(mesh, order=order)) # Neumann only, dirichlet=[1,2,3,4])
 u, w = fes.TrialFunction(), fes.TestFunction()
 g = GridFunction(fes)
 s = GridFunction(fes)
+s.Set(CoefficientFunction(1.0))
 
-conv = ParameterLF(w*K, s, conv_order)
+conv = ParameterLF(w*K, s, conv_order, repeat=1, patchSize=[dx, dy])
 
 with TaskManager():
     print('conv')
@@ -62,6 +76,7 @@ with TaskManager():
     Draw(s, mesh, 's')
     xs = np.linspace(xmin, xmax, 10)
     ys = np.linspace(ymin, ymax, 10)
+    input()
     for xx in xs:
         for yy in ys:
             s.Set(posPart(0.2-norm(0.3*(x-xx), y-yy)))

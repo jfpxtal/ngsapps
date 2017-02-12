@@ -63,15 +63,15 @@ void ExportNgsAppsUtils(py::module &m)
          })
     ;
 
-  typedef PyWrapperDerived<PeriodicCompactlySupportedKernel, CoefficientFunction> PyPeriodicCompactlySupportedKernel;
-  py::class_<PyPeriodicCompactlySupportedKernel,PyCF>
-    (m, "PeriodicCompactlySupportedKernel", "")
+  typedef PyWrapperDerived<CompactlySupportedKernel, CoefficientFunction> PyCompactlySupportedKernel;
+  py::class_<PyCompactlySupportedKernel,PyCF>
+    (m, "CompactlySupportedKernel", "")
     .def("__init__",
-         [](PyPeriodicCompactlySupportedKernel *instance, double dx, double dy, double radius, double scale)
+         [](PyCompactlySupportedKernel *instance, double radius, double scale)
          {
-           new (instance) PyPeriodicCompactlySupportedKernel(make_shared<PeriodicCompactlySupportedKernel>(dx, dy, radius, scale));
+           new (instance) PyCompactlySupportedKernel(make_shared<CompactlySupportedKernel>(radius, scale));
          },
-         py::arg("dx"), py::arg("dy"), py::arg("radius"), py::arg("scale")=1.0
+         py::arg("radius"), py::arg("scale")=1.0
       );
 
   typedef PyWrapper<ngcomp::GridFunction> PyGF;
@@ -85,11 +85,11 @@ void ExportNgsAppsUtils(py::module &m)
       "integrand is a CoefficientFunction which linearly contains a TestFunction from the FESpace to which gf belongs.\n"
       "When calculating the integral, the test function is then replaced by gf.")
     .def ("__init__",
-          [] (PyParameterLF *instance, py::object integrand, PyGF gf, int order)
+          [] (PyParameterLF *instance, py::object integrand, PyGF gf, int order, int repeat, vector<double> patchSize)
           {
-            new (instance) PyParameterLF(make_shared<ParameterLinearFormCF>(MakeCoefficient(integrand).Get(), gf.Get(), order));
+            new (instance) PyParameterLF(make_shared<ParameterLinearFormCF>(MakeCoefficient(integrand).Get(), gf.Get(), order, repeat, patchSize));
           },
-          py::arg("integrand"), py::arg("gf"), py::arg("order")=5
+          py::arg("integrand"), py::arg("gf"), py::arg("order")=5, py::arg("repeat")=0, py::arg("patchSize")=vector<int>()
       )
     ;
 
