@@ -1,7 +1,7 @@
 # ngsapps
 This repository contains applications for the [NGSolve finite element library](https://gitlab.asc.tuwien.ac.at/jschoeberl/ngsolve-docu/wikis/home).
 
-# Models
+## Models
 <table>
 <tr>
 <td>The <a href="https://github.com/jfpxtal/ngsapps/wiki/surfacebulk">surfacebulk wiki page</a> demonstrates the Trace() operator, symbolic definition of bilinear forms and Euler time stepping.</td>
@@ -52,7 +52,7 @@ This repository contains applications for the [NGSolve finite element library](h
 </tr>
 </table>
 
-# Utils
+## Utils
 - LagrangeFESpace
 - ParameterLF
 - ComposeCF
@@ -60,4 +60,4 @@ This repository contains applications for the [NGSolve finite element library](h
 - CacheCF
 - ZLogZCF
 
-# Build instructions
+## Build instructions
