@@ -5,61 +5,41 @@
 namespace ngfem
 {
 
-  PeriodicCompactlySupportedKernel::PeriodicCompactlySupportedKernel(double adx, double ady, double aradius, double ascale)
-    : CoefficientFunction(1, false), dx(adx), dy(ady), radius(aradius), scale(ascale)
+  CompactlySupportedKernel::CompactlySupportedKernel(double aradius, double ascale)
+    : CoefficientFunction(1, false), radius(aradius), scale(ascale)
   {}
 
-  double PeriodicCompactlySupportedKernel::Evaluate (const BaseMappedIntegrationPoint & ip) const
+  double CompactlySupportedKernel::Evaluate (const BaseMappedIntegrationPoint & ip) const
   {
     const auto &p = ip.GetPoint();
     const auto &paramCoords = static_cast<ParameterLFUserData*>(ip.GetTransformation().userdata)->paramCoords;
-    double res = 0.0;
-    for (int i : {-1, 0, 1})
-    {
-      for (int j : {-1, 0, 1})
-      {
-        auto x = p[0] - paramCoords[0] + i*dx;
-        auto y = p[1] - paramCoords[1] + j*dy;
-        double d =  1 - sqrt(x*x+y*y)/radius;
-        if (d > 0) res += d;
-      }
-    }
-    return scale*res;
+    auto x = p[0] - paramCoords[0];
+    auto y = p[1] - paramCoords[1];
+    double d =  1 - sqrt(x*x+y*y)/radius;
+    if (d > 0) return scale*d;
+    else return 0;
   }
 
-  void PeriodicCompactlySupportedKernel::Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
+  void CompactlySupportedKernel::Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const
   {
     const auto &ps = ir.GetPoints();
     const auto &paramCoords = static_cast<ParameterLFUserData*>(ir.GetTransformation().userdata)->paramCoords;
     for (int k = 0; k < ir.Size(); k++)
     {
-      values(0, k) = 0.0;
-      for (int i : {-1, 0, 1})
-      {
-        for (int j : {-1, 0, 1})
-        {
-          // cout << "i " << i << " " << j << " " << endl;
-          // cout << ps.Get(k, 0) << endl << paramCoords[0] << endl << i*dx << endl << endl;
-          // cout << ps.Get(k, 1) << endl << paramCoords[1] << endl << j*dy << endl << endl;
-          auto x = ps.Get(k, 0) - paramCoords[0] + i*dx;
-          // cout << "x " << x << endl << endl;
-          auto y = ps.Get(k, 1) - paramCoords[1] + j*dy;
-          // cout << "y " << y << endl << endl;
-          auto d =  FMA(-1/radius, sqrt(x*x+y*y), 1);
-          // cout << d << endl << endl;
-          // values(0, k) += scale*ngstd::IfPos(d, d, 0);
-          values(0, k) = FMA(scale, ngstd::IfPos(d, d, 0), values(0, k));
-          // cout << values(0, k) << endl << endl << endl;
-        }
-      }
+      auto x = ps.Get(k, 0) - paramCoords[0];
+      auto y = ps.Get(k, 1) - paramCoords[1];
+      auto d =  FMA(-1/radius, sqrt(x*x+y*y), 1);
+      values(0, k) = scale*ngstd::IfPos(d, d, 0);
     }
   }
 
+
   ParameterLinearFormCF::ParameterLinearFormCF (shared_ptr<CoefficientFunction> aintegrand,
-                                                                  shared_ptr<ngcomp::GridFunction> agf,
-                                                                  int aorder)
+                                                shared_ptr<ngcomp::GridFunction> agf,
+                                                int aorder, int arepeat, vector<double> apatchSize)
   : CoefficientFunction(aintegrand->Dimension(), aintegrand->IsComplex()),
-    integrand(aintegrand), gf(agf), order(aorder),
+    integrand(aintegrand), gf(agf), order(aorder), repeat(arepeat), patchSize(apatchSize),
+    fes(gf->GetFESpace()), numPatches(1),
     LUT(agf->GetFESpace()->GetMeshAccess()->GetNE()), SIMD_LUT(agf->GetFESpace()->GetMeshAccess()->GetNE())
   {
     if (integrand->Dimension() != 1)
@@ -73,6 +53,8 @@ namespace ngfem
        });
     if (proxies.Size() != 1)
       throw Exception ("ParameterLinearFormCF: the integrand has to contain exactly one proxy: the test function of gf's FESpace");
+
+    for (int i = 0; i < fes->GetSpacialDimension(); i++) numPatches *= 2*repeat + 1;
   }
 
   ParameterLinearFormCF::~ParameterLinearFormCF ()
@@ -116,7 +98,6 @@ namespace ngfem
       auto lh = LocalHeap(100000, "parameterlf lh");
       //cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << endl << endl << endl;
       //cout << "ir " << ir.IR() << endl << endl;
-      auto fes = gf->GetFESpace();
       // //cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
       it = irSizeMap.emplace(ir.Size(), Matrix<double>(ir.Size(), fes->GetNDof())).first;
       it->second = 0;
@@ -124,7 +105,6 @@ namespace ngfem
       //cout << "points " << points << endl << endl;
       ParameterLFUserData ud;
       ud.paramCoords.AssignMemory(fes->GetSpacialDimension(), lh);
-      // FlatVector<double> gfvec(fes->GetNDof(), lh);
       // fes->IterateElements doesn't work if Evaluate was called inside a TaskManager task
       // because TaskManager gets stuck on nested tasks
       for (const auto &el : fes->Elements(VOL, lh))
@@ -137,6 +117,8 @@ namespace ngfem
         //cout << "fel order" << el.GetFE().Order() << endl << endl;
         //cout << "myIR " << myIR << endl << endl;
         auto & myMIR = trafo(myIR, lh);
+        const auto &periodicMIR = MakePeriodicMIR<BaseMappedIntegrationRule>(myMIR, lh);
+
         auto & fel = el.GetFE();
         int elvec_size = fel.GetNDof()*fes->GetDimension();
         //cout << "elvec_size " << elvec_size << endl << endl;
@@ -154,18 +136,24 @@ namespace ngfem
           for (auto proxy : proxies)
           {
             FlatMatrix<double> proxyvalues(myIR.Size(), proxy->Dimension(), lh);
+            proxyvalues = 0;
             for (int k = 0; k < proxy->Dimension(); k++)
             {
               //cout << "k " << k << endl;
               ud.testfunction = proxy;
               ud.test_comp = k;
 
-              FlatMatrix<double> intVals(myMIR.Size(), 1, lh);
-              integrand->Evaluate(myMIR, intVals);
+              FlatMatrix<double> intVals(periodicMIR.Size(), 1, lh);
+
+              integrand->Evaluate(periodicMIR, intVals);
               //cout << "intvals " << intVals << endl << endl;
-              for (size_t i = 0; i < myMIR.Size(); i++) {
-                //cout << "i " << i << " weight " << myMIR[i].GetWeight() << " " << intVals(i, 0) << endl << endl;
-                proxyvalues(i, k) = myMIR[i].GetWeight() * intVals(i, 0);
+              for (int patch = 0; patch < numPatches; patch++)
+              {
+                for (size_t i = 0; i < myMIR.Size(); i++)
+                {
+                  proxyvalues(i, k) += myMIR[i].GetWeight() * intVals(patch*myMIR.Size() + i, 0);
+                  //cout << "i " << i << " weight " << myMIR[i].GetWeight() << " " << intVals(i, 0) << endl << endl;
+                }
               }
             }
             //cout << "proxvals " << proxyvalues << endl << endl;
@@ -211,14 +199,12 @@ namespace ngfem
       auto lh = LocalHeap(100000, "parameterlf lh");
       //cout << ir.IR() << endl << endl;
       //cout << ir << endl << endl;
-      auto fes = gf->GetFESpace();
       // cout << "cache miss " << ir.GetTransformation().GetElementNr() << " " << ir.Size() << endl;
       it = irSizeMap.emplace(ir.Size(), Matrix<SIMD<double>>(ir.Size(), fes->GetNDof())).first;
       it->second = SIMD<double>(0);
       auto points = ir.GetPoints();
       ParameterLFUserData ud;
       ud.paramCoords.AssignMemory(fes->GetSpacialDimension(), lh);
-      // FlatVector<double> gfvec(fes->GetNDof(), lh);
       // fes->IterateElements doesn't work if Evaluate was called inside a TaskManager task
       // because TaskManager gets stuck on nested tasks
       for (const auto &el : fes->Elements(VOL, lh))
@@ -229,6 +215,8 @@ namespace ngfem
         SIMD_IntegrationRule myIR(el.GetType(), order);
         //cout << "myIR " << myIR << endl << endl;
         auto & myMIR = trafo(myIR, lh);
+        const auto &periodicMIR = MakePeriodicMIR<SIMD_BaseMappedIntegrationRule>(myMIR, lh);
+
         auto & fel = el.GetFE();
         int elvec_size = fel.GetNDof()*fes->GetDimension();
         FlatVector<double> elvec(elvec_size, lh);
@@ -244,14 +232,24 @@ namespace ngfem
             for (auto proxy : proxies)
             {
               FlatMatrix<SIMD<double>> proxyvalues(proxy->Dimension(), myIR.Size(), lh);
+              proxyvalues = 0;
               for (int k = 0; k < proxy->Dimension(); k++)
               {
                 ud.testfunction = proxy;
                 ud.test_comp = k;
 
-                integrand->Evaluate(myMIR, proxyvalues.Rows(k,k+1));
-                for (size_t i = 0; i < myMIR.Size(); i++)
-                  proxyvalues(k,i) *= myMIR[i].GetWeight();
+                FlatMatrix<SIMD<double>> intVals(1, periodicMIR.Size(), lh);
+
+                // integrand->Evaluate(periodicMIR, proxyvalues.Rows(k,k+1));
+                integrand->Evaluate(periodicMIR, intVals);
+                for (int patch = 0; patch < numPatches; patch++)
+                {
+                  for (size_t i = 0; i < myMIR.Size(); i++)
+                  {
+                    proxyvalues(k, i) += myMIR[i].GetWeight() * intVals(0, patch*myMIR.Size() + i);
+                    //cout << "i " << i << " weight " << myMIR[i].GetWeight() << " " << intVals(i, 0) << endl << endl;
+                  }
+                }
               }
 
               proxy->Evaluator()->AddTrans(fel, myMIR, proxyvalues, elvec);
