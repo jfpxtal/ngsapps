@@ -22,7 +22,7 @@ progversion = "0.1"
 valGrid = []
 valGrid.append([1, 2, 3])
 valGrid.append([i*0.02 for i in range(3, 14)])
-valGrid.append([20, 25, 30, 50, 100, 200, 1000])
+valGrid.append([20, 25, 30, 50, 100, 200, 1000, 'CG'])
 
 params = ['order', 'maxh', 'eta']
 
@@ -171,10 +171,10 @@ class ApplicationWindow(QMainWindow):
 
         for prodVals in product(*prodList):
             fname = '../data/crossdiff/topf/order' + str(prodVals[0]) + '_maxh' + str(prodVals[1])
-            if DG:
-                fname += '_formDG_eta' + str(prodVals[2])
-            else:
+            if prodVals[2] == 'CG':
                 fname += '_formCG'
+            else:
+                fname += '_formDG_eta' + str(prodVals[2])
             fname += '_conv' + str(conv) + '.csv'
 
             ts = []

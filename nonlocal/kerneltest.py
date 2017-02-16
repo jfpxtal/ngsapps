@@ -6,7 +6,7 @@ import numpy as np
 from netgen.geom2d import SplineGeometry
 
 order = 2
-conv_order = 3
+conv_order = 10
 maxh = 0.09
 # maxh = 0.15
 # maxh = 0.3
@@ -33,14 +33,7 @@ ymin = -1
 ymax = 2
 dx = xmax-xmin
 dy = ymax-ymin
-pnts = [(xmin,ymin),(xmax,ymin),(xmax,ymax),(xmin,ymax)]
-lines = [ (0,1,1,"bottom"), (1,2,2,"right"), (2,3,3,"top"), (3,0,4,"left") ]
-pnums = [geo.AppendPoint(*p) for p in pnts]
-
-lbot = geo.Append ( ["line", pnums[0], pnums[1]], bc="bottom")
-lright = geo.Append ( ["line", pnums[1], pnums[2]], bc="right")
-geo.Append ( ["line", pnums[0], pnums[3]], leftdomain=0, rightdomain=1, bc="left", copy=lright)
-geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top", copy=lbot)
+MakePeriodicRectangle(geo, (xmin, ymin), (xmax, ymax))
 
 # pyK = CoefficientFunction(0.0)
 # xcenter, ycenter = -1.9, 1.5
@@ -52,12 +45,14 @@ geo.Append ( ["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc="top"
 
 
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
-# K = CompactlySupportedKernel(1)
+K = CompactlySupportedKernel(1)
+# K = PeriodicCompactlySupportedKernel(dx, dy, 0.3)
 # K = IfPos(1-sqrt(pow(x-xPar, 2)+sqr(y-yPar)), 1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-# K = IfPos(1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 1-sqrt(sqr(x-xPar)+sqr(y-yPar)), 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+# radius=0.3
+# K = IfPos(1-sqrt(sqr(x-xPar)+sqr(y-yPar))/radius, 1-sqrt(sqr(x-xPar)+sqr(y-yPar))/radius, 0) # k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 thin = 1
 k0 = 1
-K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
+# K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
 
 # H1-conforming finite element space
 fes = Periodic(H1(mesh, order=order)) # Neumann only, dirichlet=[1,2,3,4])
@@ -66,11 +61,14 @@ g = GridFunction(fes)
 s = GridFunction(fes)
 s.Set(CoefficientFunction(1.0))
 
-conv = ParameterLF(w*K, s, conv_order, repeat=1, patchSize=[dx, dy])
+conv = ParameterLF(w*K, s, conv_order, repeat=0, patchSize=[dx, dy])
+# conv = ParameterLF(w*K, s, conv_order)
 
 with TaskManager():
     print('conv')
     g.Set(conv)
+    # vtk = MyVTKOutput(ma=mesh,coefs=[g],names=["g"],filename="convbug2",subdivision=3)
+    # vtk.Do()
     print('conv end')
     Draw(g, mesh, 'conv')
     Draw(s, mesh, 's')

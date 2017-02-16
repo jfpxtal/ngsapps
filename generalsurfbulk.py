@@ -102,8 +102,8 @@ s = GridFunction(fes)
 s.components[0].Set(x * sin(x + 1) + 0.5)
 s.components[1].Set((2 - x) * cos(x + 1) + 0.5)
 # surface components:
-s.components[2].Set(0.3 * (2 - y) + 1, boundary=True)
-s.components[3].Set(0.4 * y + 1, boundary=True)
+s.components[2].Set(0.3 * (2 - y) + 1, BND)
+s.components[3].Set(0.4 * y + 1, BND)
 
 # build matrix for implicit Euler
 mstar = a.mat.CreateMatrix()
@@ -115,8 +115,8 @@ rhs = s.vec.CreateVector()
 ext_p = GridFunction(VExt)
 ext_l = GridFunction(VExt)
 
-ext_l.Set(s.components[2],boundary=True)
-ext_p.Set(s.components[3],boundary=True)
+ext_l.Set(s.components[2], BND)
+ext_p.Set(s.components[3],BND)
 
 Draw(ext_p, mesh, "ext_p")
 Draw(ext_l, mesh, "ext_l")
@@ -152,8 +152,8 @@ while t < tend:
     rhs.data = c.mat * s.vec
     s.vec.data = invmat * rhs
 
-    ext_l.Set(s.components[2],boundary=True)
-    ext_p.Set(s.components[3],boundary=True)
+    ext_l.Set(s.components[2], BND)
+    ext_p.Set(s.components[3], BND)
     t += tau
     Redraw(blocking=True)
     if vtkoutput:
