@@ -6,8 +6,6 @@ order = 3
 maxh = 7
 
 # time step and end
-# supplementary material says tau=1, but that seems much too high
-# tau = 0.001
 tau = 1
 tend = -1
 
@@ -67,10 +65,11 @@ g = GridFunction(fes)
 grho, gWx, gWy = g.components
 gW = CoefficientFunction((gWx, gWy))
 vbar = v * exp(-alpha*grho)
-gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar*exp(-alpha*grho)
+gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar
 # is this correct?
 WdotdelW = CoefficientFunction((gW*gradWx, gW*gradWy))
-gradnormWsq = 2*CoefficientFunction((gWx*Wxdx, gWy*Wydy))
+# gradnormWsq = 2*CoefficientFunction((gWx*Wxdx, gWy*Wydy))
+gradnormWsq = 2*gWx*gradWx + 2*gWy*gradWy
 
 # initial values
 # grho.Set(exp(-sqr(x)-sqr(y)))
