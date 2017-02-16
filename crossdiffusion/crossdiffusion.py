@@ -22,9 +22,9 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-p.Dr = 0.05
+p.Dr = 0.1
 # blue species
-p.Db = 0.15
+p.Db = 0.3
 
 # advection potentials
 p.Vr = -x+sqr(y-0.5)
@@ -40,7 +40,7 @@ eta = 15
 # form = CGFormulation()
 form = DGFormulation(eta)
 
-conv = True
+conv = False
 
 # geometry and mesh
 geo = SplineGeometry()
