@@ -18,9 +18,9 @@ namespace ngfem
 
     auto angle = atan2(p[1], p[0])*180/M_PI;
     if (-90-phi0/2 < angle && angle < -90+phi0/2)
-      return v0/2 * (1 + 2*(angle+90)/phi0);
+      return v0/2 * (1 - 2*(angle+90)/phi0);
     else if (90-phi0/2 < angle && angle < 90+phi0/2)
-      return v0/2 * (1 + 2*(angle-90)/phi0);
+      return v0/2 * (1 - 2*(angle-90)/phi0);
     else return v0;
   }
 // virtual void Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const;
@@ -34,9 +34,9 @@ namespace ngfem
 
     auto angle = atan2(p[1], p[0])*180/M_PI;
     if (-90-phi0/2 < angle && angle < -90+phi0/2)
-      return -v0 * p[1]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
+      return v0 * p[1]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
     else if (90-phi0/2 < angle && angle < 90+phi0/2)
-      return -v0 * p[1]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
+      return v0 * p[1]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
     else return 0;
   }
 
@@ -49,9 +49,9 @@ namespace ngfem
 
     auto angle = atan2(p[1], p[0])*180/M_PI;
     if (-90-phi0/2 < angle && angle < -90+phi0/2)
-      return v0 * p[0]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
+      return -v0 * p[0]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
     else if (90-phi0/2 < angle && angle < 90+phi0/2)
-      return v0 * p[0]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
+      return -v0 * p[0]/(p[0]*p[0]+p[1]*p[1])/phi0 * 180/M_PI;
     else return 0;
   }
 }

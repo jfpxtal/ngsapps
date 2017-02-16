@@ -68,7 +68,6 @@ vbar = v * exp(-alpha*grho)
 gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar
 # is this correct?
 WdotdelW = CoefficientFunction((gW*gradWx, gW*gradWy))
-# gradnormWsq = 2*CoefficientFunction((gWx*Wxdx, gWy*Wydy))
 gradnormWsq = 2*gWx*gradWx + 2*gWy*gradWy
 
 # initial values
