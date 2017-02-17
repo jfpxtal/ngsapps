@@ -31,15 +31,18 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-# local propulsion speed
+# local swim speed
+Rinner = 30
+Router = 90
 # not sure about v0
-# Router: leave space between annulus and domain boundary?
-v = AnnulusSpeedCF(Rinner=50, Router=100, phi0=50, vout=0.05, v0=0.2)
+v = AnnulusSpeedCF(Rinner, Router, phi0=50, vout=0.1, v0=0.2)
 vdx = v.Dx()
 vdy = v.Dy()
 gradv = CoefficientFunction((vdx, vdy))
 
 geo = SplineGeometry()
+geo.AddCircle((0, 0), Rinner, leftdomain=1, rightdomain=1)
+geo.AddCircle((0, 0), Router, leftdomain=1, rightdomain=1)
 MakePeriodicRectangle(geo, (-100, -100), (100, 100))
 mesh = Mesh(geo.GenerateMesh(maxh=maxh))
 
