@@ -8,6 +8,7 @@
 #include "parameterlf.hpp"
 #include "cachecf.hpp"
 #include "zlogzcf.hpp"
+#include "annulusspeedcf.hpp"
 
 using namespace ngfem;
 
@@ -41,6 +42,26 @@ void ExportNgsAppsUtils(py::module &m)
            new (instance) PyZLogZ(make_shared<ZLogZCoefficientFunction>(MakeCoefficient(cf).Get()));
          }
       );
+
+  typedef PyWrapperDerived<AnnulusSpeedCoefficientFunction, CoefficientFunction> PyAnnulusSpeedCF;
+  py::class_<PyAnnulusSpeedCF,PyCF>
+    (m, "AnnulusSpeedCF", "")
+    .def("__init__",
+         [](PyAnnulusSpeedCF *instance, double Rinner, double Router, double phi0, double vout, double v0)
+         {
+           new (instance) PyAnnulusSpeedCF(make_shared<AnnulusSpeedCoefficientFunction>(Rinner, Router, phi0, vout, v0));
+         },
+         py::arg("Rinner"), py::arg("Router"), py::arg("phi0"), py::arg("vout"), py::arg("v0")
+      )
+    .def("Dx", [](PyAnnulusSpeedCF & self) -> PyCF
+         {
+           return self->Dx();
+         })
+    .def("Dy", [](PyAnnulusSpeedCF & self) -> PyCF
+         {
+           return self->Dy();
+         })
+    ;
 
   typedef PyWrapperDerived<ComposeCoefficientFunction, CoefficientFunction> PyComposeCF;
   py::class_<PyComposeCF,PyCF>

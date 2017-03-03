@@ -7,6 +7,7 @@ add_library(ngsapps_utils ${NGS_LIB_TYPE}
   convolutioncf.hpp convolutioncf.cpp
   cachecf.hpp cachecf.cpp
   zlogzcf.hpp zlogzcf.cpp
+  annulusspeedcf.hpp annulusspeedcf.cpp
   utils.hpp utils.cpp
   )
 

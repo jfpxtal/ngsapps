@@ -12,6 +12,12 @@ zPar = ParameterLFProxy(2)
 def sqr(x):
     return x*x
 
+def norm(x, y):
+    return sqrt(sqr(x)+sqr(y))
+
+def posPart(x):
+    return IfPos(x, x, 0)
+
 def Lagrange(mesh, **args):
     """
     Create H1 finite element space with Lagrange basis.
@@ -60,6 +66,19 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
                                pnums[i + 1 + M * (N + 1)]], index=3))
 
     return netmesh
+
+def MakePeriodicRectangle(geo, p1, p2, bc=None, bcs=None, **args):
+    p1x, p1y = p1
+    p2x, p2y = p2
+    p1x,p2x = min(p1x,p2x), max(p1x, p2x)
+    p1y,p2y = min(p1y,p2y), max(p1y, p2y)
+    if not bcs: bcs=4*[bc]
+    print ("bcs = ", bcs)
+    pnums = [geo.AppendPoint(*p) for p in [(p1x,p1y), (p2x, p1y), (p2x, p2y), (p1x, p2y)]]
+    lbot = geo.Append(["line", pnums[0], pnums[1]], bc=bcs[0])
+    lright = geo.Append(["line", pnums[1], pnums[2]], bc=bcs[1])
+    geo.Append(["line", pnums[3], pnums[2]], leftdomain=0, rightdomain=1, bc=bcs[2], copy=lbot, **args)
+    geo.Append(["line", pnums[0], pnums[3]], leftdomain=0, rightdomain=1, bc=bcs[3], copy=lright, **args)
 
 class ConvolutionCache:
     def __init__(self, conv):
