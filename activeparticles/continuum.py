@@ -1,12 +1,15 @@
 from ngsolve import *
 from netgen.geom2d import SplineGeometry, unit_square
 from ngsapps.utils import *
+import settings
 
 order = 3
 maxh = 7
 
+vtkoutput = False
+
 # time step and end
-tau = 1
+tau = 0.1
 tend = -1
 
 # diffusion coefficient for rho
@@ -31,23 +34,12 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-# local swim speed
-Rinner = 30
-Router = 90
-# not sure about v0
-v = AnnulusSpeedCF(Rinner, Router, phi0=50, vout=0.1, v0=0.2)
-vdx = v.Dx()
-vdy = v.Dy()
+mesh, v, vdx, vdy = settings.annulus(order, maxh)
 gradv = CoefficientFunction((vdx, vdy))
 
-geo = SplineGeometry()
-geo.AddCircle((0, 0), Rinner, leftdomain=1, rightdomain=1)
-geo.AddCircle((0, 0), Router, leftdomain=1, rightdomain=1)
-MakePeriodicRectangle(geo, (-100, -100), (100, 100))
-mesh = Mesh(geo.GenerateMesh(maxh=maxh))
-
-fes1 = Periodic(H1(mesh, order=order))
-fes = FESpace([fes1, fes1, fes1])
+fesRho = Periodic(H1(mesh, order=order))
+fesW = Periodic(H1(mesh, order=order-1))
+fes = FESpace([fesRho, fesW, fesW])
 
 rho, Wx, Wy = fes.TrialFunction()
 trho, tWx, tWy = fes.TestFunction()
@@ -86,9 +78,13 @@ a = BilinearForm(fes)
 # equation for rho
 # TODO: boundary terms from partial integration?
 # TODO: separate terms which need to be reassembled at every time step
-a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
+a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
+# a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
 
-# equation for W
+# # equation for W
+# a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
+#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
+#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
@@ -107,6 +103,10 @@ Draw(v, mesh, 'v')
 Draw(gW, mesh, 'W')
 Draw(grho, mesh, 'rho')
 
+if vtkoutput:
+    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2]],names=["rho", "Wx", "Wy"], filename="instab/instab",subdivision=3)
+    vtk.Do()
+
 input("Press any key...")
 t = 0.0
 with TaskManager():
@@ -123,4 +123,7 @@ with TaskManager():
         g.vec.data = invmat * rhs
 
         Redraw(blocking=False)
-        # input()
+        # if t > 12:
+        #     input()
+        if vtkoutput:
+            vtk.Do()
