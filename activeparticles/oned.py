@@ -48,6 +48,7 @@ for i in range(0, N):
 
 netmesh.Add(Element0D(pnums[0], index=1))
 netmesh.Add(Element0D(pnums[N], index=2))
+netmesh.AddPointIdentification(pnums[0], pnums[-1], 1, 2)
 mesh = Mesh(netmesh)
 
 v0 = 0.2
@@ -62,8 +63,8 @@ vdx = IfPos(100-x, 0,
                     IfPos(400-x, 0,
                         IfPos(500-x, (vmin-v0)/100, 0))))
 
-fesRho = H1(mesh, order=order)
-fesW = H1(mesh, order=order-1)
+fesRho = Periodic(H1(mesh, order=order))
+fesW = Periodic(H1(mesh, order=order-1))
 fes = FESpace([fesRho, fesW])
 
 rho, W = fes.TrialFunction()
@@ -96,7 +97,7 @@ a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
 #                  -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(tW)
 #                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
-                 -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(W)
+                 -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(tW)
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 
 m = BilinearForm(fes)
@@ -135,6 +136,8 @@ with TaskManager():
 
         if k % 20 == 0:
             line.set_ydata([grho(i) for i in mips])
+            plt.gca().relim()
+            plt.gca().autoscale_view()
             # plt.gcf().canvas.draw()
             plt.pause(0.05)
 

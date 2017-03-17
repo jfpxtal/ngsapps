@@ -9,7 +9,7 @@ maxh = 7
 vtkoutput = False
 
 # time step and end
-tau = 0.1
+tau = 1
 tend = -1
 
 # diffusion coefficient for rho
@@ -34,7 +34,10 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-mesh, v, vdx, vdy = settings.annulus(order, maxh)
+# mesh, v = settings.annulusInPeriodicSquare(order, maxh)
+mesh, v = settings.annulus(order, maxh)
+vdx = v.Dx()
+vdy = v.Dy()
 gradv = CoefficientFunction((vdx, vdy))
 
 fesRho = Periodic(H1(mesh, order=order))
@@ -54,14 +57,19 @@ gradWx = CoefficientFunction((Wxdx, Wxdy))
 gradWy = CoefficientFunction((Wydx, Wydy))
 
 tW = CoefficientFunction((tWx, tWy))
-divtW = grad(tWx)[0] + grad(tWy)[1]
+tWxdx = grad(tWx)[0]
+tWxdy = grad(tWx)[1]
+tWydx = grad(tWy)[0]
+tWydy = grad(tWy)[1]
+divtW = tWxdx + tWydy
+gradtWx = CoefficientFunction((tWxdx, tWxdy))
+gradtWy = CoefficientFunction((tWydx, tWydy))
 
 g = GridFunction(fes)
 grho, gWx, gWy = g.components
 gW = CoefficientFunction((gWx, gWy))
 vbar = v * exp(-alpha*grho)
 gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar
-# is this correct?
 WdotdelW = CoefficientFunction((gW*gradWx, gW*gradWy))
 gradnormWsq = 2*gWx*gradWx + 2*gWy*gradWy
 
@@ -86,7 +94,7 @@ a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
 #                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
 #                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
-                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
+                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*gradWx*gradtWx - k*gradWy*gradtWy
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 
 m = BilinearForm(fes)
