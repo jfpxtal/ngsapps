@@ -22,7 +22,7 @@ endif(NOT WIN32)
 
 if(USE_PYTHON)
     install (FILES
-            utils.py meshtools.py merge_meshes.py
+            utils.py meshtools.py merge_meshes.py plotting.py
             DESTINATION ${PYTHON_PACKAGES_INSTALL_DIR}/ngsapps
             COMPONENT ngsapps
             )
