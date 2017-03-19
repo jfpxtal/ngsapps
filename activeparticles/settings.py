@@ -5,7 +5,7 @@ from ngsapps.utils import *
 Rinner = 30
 Router = 90
 phi0 = 50
-vout = 0.1
+vout = 0.1 # ?, doesn't matter for just the annulus
 v0 = 0.2
 
 def annulusInPeriodicSquare(order, maxh):
@@ -19,7 +19,7 @@ def annulusInPeriodicSquare(order, maxh):
     # not sure about v0
     v = AnnulusSpeedCF(Rinner, Router, phi0, vout, v0)
 
-    return mesh, v, v.Dx(), v.Dy()
+    return mesh, v
 
 def annulus(order, maxh):
     geo = SplineGeometry()
@@ -32,4 +32,4 @@ def annulus(order, maxh):
     # not sure about v0
     v = AnnulusSpeedCF(0, Router, phi0, vout, v0)
 
-    return mesh, v, v.Dx(), v.Dy()
+    return mesh, v

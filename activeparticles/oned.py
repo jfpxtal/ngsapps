@@ -3,6 +3,7 @@ from netgen.geom2d import SplineGeometry, unit_square
 from ngsapps.utils import *
 import matplotlib.pyplot as plt
 import numpy as np
+from ngsapps.plotting import *
 
 order = 3
 maxh = 1
@@ -108,10 +109,15 @@ m.Assemble()
 rhs = g.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-xs = np.linspace(0, L, L/maxh)
-mips = [mesh(x) for x in xs]
-plt.plot(xs, [v(i)/v0 for i in mips])
-line, = plt.plot(xs, [grho(i) for i in mips])
+# xs = np.linspace(0, L, L/maxh)
+# mips = [mesh(x) for x in xs]
+# plt.plot(xs, [v(i)/v0 for i in mips])
+# line, = plt.plot(xs, [grho(i) for i in mips])
+# plt.figure()
+# line2, = plt.plot(xs, [gW(i)/grho(i) for i in mips])
+mplmesh = MPLMesh1D(mesh)
+lineRho = mplmesh.plot(grho)
+lineW = mplmesh.plot(gW/grho)
 plt.show(block=False)
 
 if vtkoutput:
@@ -135,7 +141,8 @@ with TaskManager():
         g.vec.data = invmat * rhs
 
         if k % 20 == 0:
-            line.set_ydata([grho(i) for i in mips])
+            lineRho.Redraw()
+            lineW.Redraw()
             plt.gca().relim()
             plt.gca().autoscale_view()
             # plt.gcf().canvas.draw()
