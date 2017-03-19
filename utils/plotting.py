@@ -29,7 +29,7 @@ class MPLMesh1D:
             self.px.append(math.nan)
             self.mips.append(math.nan)
 
-    def plot(self, func, ax=None, *args, **kwargs):
+    def Plot(self, func, ax=None, *args, **kwargs):
         if not ax:
             ax = plt.gca()
 
@@ -70,7 +70,7 @@ class MPLMesh2D:
 
         self.triang = Triangulation(px, py, triangles)
 
-    def plot(self, func, ax=None, *args, **kwargs):
+    def Plot(self, func, ax=None, *args, **kwargs):
         if not ax:
             ax = plt.gca()
 
@@ -119,7 +119,7 @@ class MPLTriSurf:
         self.surf.remove()
         self.Draw(self.func, self.ax, *self.args, **self.kwargs)
 
-def plot(func, ax=None, mplmesh=None, mesh=None, subdivision=1, *args, **kwargs):
+def Plot(func, ax=None, mplmesh=None, mesh=None, subdivision=1, *args, **kwargs):
     if not mplmesh:
         if not mesh:
             # only works for GridFunctions, not CoefficientFunctions
@@ -135,4 +135,4 @@ def plot(func, ax=None, mplmesh=None, mesh=None, subdivision=1, *args, **kwargs)
         else:
             ax = plt.gca(projection='3d')
 
-    return mplmesh.plot(func, ax, *args, **kwargs)
+    return mplmesh.Plot(func, ax, *args, **kwargs)

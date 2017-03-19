@@ -109,15 +109,10 @@ m.Assemble()
 rhs = g.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-# xs = np.linspace(0, L, L/maxh)
-# mips = [mesh(x) for x in xs]
-# plt.plot(xs, [v(i)/v0 for i in mips])
-# line, = plt.plot(xs, [grho(i) for i in mips])
-# plt.figure()
-# line2, = plt.plot(xs, [gW(i)/grho(i) for i in mips])
 mplmesh = MPLMesh1D(mesh)
-lineRho = mplmesh.plot(grho)
-lineW = mplmesh.plot(gW/grho)
+mplmesh.Plot(v/v0)
+lineRho = mplmesh.Plot(grho)
+lineW = mplmesh.Plot(gW/grho)
 plt.show(block=False)
 
 if vtkoutput:
