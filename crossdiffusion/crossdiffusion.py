@@ -14,17 +14,19 @@ from cgform import CGFormulation
 
 
 order = 3
-maxh = 0.3
+maxh = 0.1
 
 convOrder = 3
 
 p = CrossDiffParams()
 
 # diffusion coefficients
-# red species
-p.Dr = 0.1
-# blue species
-p.Db = 0.3
+# # red species
+# p.Dr = 0.05
+# # blue species
+# p.Db = 0.15
+p.Dr = 0.004
+p.Db = 0.001
 
 # advection potentials
 p.Vr = -x+sqr(y-0.5)
@@ -44,7 +46,7 @@ conv = False
 
 # geometry and mesh
 geo = SplineGeometry()
-doms = geometries.patchClamp(geo)
+doms = geometries.square(geo)
 for d in range(1, doms+1):
     geo.SetMaterial(d, 'top')
 
@@ -171,7 +173,7 @@ with TaskManager():
         ax.autoscale_view()
         fig.canvas.draw()
 
-        # input()
+        input()
 
 outfile.close()
 

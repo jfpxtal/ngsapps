@@ -3,6 +3,11 @@ from netgen.geom2d import unit_square, SplineGeometry
 # geometries for crossdiffusion
 # return the number of domains used
 
+def square(geo):
+    geo.AddRectangle((0, 0), (1, 1))
+
+    return 1
+
 def window(geo):
     geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
     geo.AddRectangle((0.2, 0.2), (0.9, 0.8), leftdomain=0, rightdomain=1)

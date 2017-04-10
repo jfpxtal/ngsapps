@@ -1,5 +1,7 @@
 from ngsolve import *
 from ngsapps.utils import *
+import scipy.optimize as opt
+import itertools as it
 
 import numpy as np
 
@@ -36,34 +38,26 @@ def stationarySols(p, fes, mat):
     mr = Integrate(p.s.components[0], mesh, definedon=mat)
     mb = Integrate(p.s.components[1], mesh, definedon=mat)
 
+    def J(uv):
+        return AApply(uv, p, mesh, mat) - [mr, mb]
+    def DJ(uv):
+        return AssembleLinearization(uv, p, mesh, mat)
+
     rbinfty = GridFunction(fes)
     rinfty = rbinfty.components[0]
     binfty = rbinfty.components[1]
 
-    #rinfty = Integrate(r2, mesh, definedon=mat) / domainSize
-    #binfty = Integrate(b2, mesh, definedon=mat) / domainSize
-
-    #### TODO: Add diffusion coeffs
-
-    # Newton Solver to determine stationary solutions
-
-    updnorm = 1e99
-    uvinfty = np.hstack((0.0,0.0))
-    # Newton solver
-    print('Start Newton...')
-    with TaskManager():
-        while updnorm > 1e-9:
-            rhs = AApply(uvinfty, p, mesh, mat) - np.hstack((mr, mb))
-            Alin = AssembleLinearization(uvinfty, p, mesh, mat)
-        #    hurgh
-            upd = np.linalg.solve(Alin, rhs)
-
-            updnorm = np.linalg.norm(upd)
-
-            uvinfty = uvinfty - 0.1*upd
-            # input('')
-
-    print('Newton converged with error' + '|w| = {:7.3e} '.format(updnorm),end='\n')
+    print('Root finder...', end='')
+    for x,y in it.product(np.arange(-1, 1, 0.1), repeat=2):
+        optres = opt.root(J, [x,y], jac=DJ)
+        if optres.success:
+            print('converged')
+            break
+        print('.', end='')
+    if not optres.success:
+        print()
+        raise RuntimeError('Root finder did not converge!')
+    uvinfty = optres.x
 
     rinfty.Set(exp((uvinfty[0]-p.Vr)/p.Dr) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
     binfty.Set(exp((uvinfty[1]-p.Vb)/p.Db) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
