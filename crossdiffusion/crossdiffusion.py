@@ -25,8 +25,8 @@ p = CrossDiffParams()
 # p.Dr = 0.05
 # # blue species
 # p.Db = 0.15
-p.Dr = 0.004
-p.Db = 0.001
+p.Dr = 0.0004
+p.Db = 0.0001
 
 # advection potentials
 p.Vr = -x+sqr(y-0.5)
@@ -172,8 +172,6 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
-
-        input()
 
 outfile.close()
 
