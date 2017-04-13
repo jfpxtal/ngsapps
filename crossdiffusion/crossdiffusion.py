@@ -45,16 +45,6 @@ form = DGFormulation(eta)
 
 conv = False
 
-# geometry and mesh
-geo = SplineGeometry()
-doms = geometries.window(geo)
-for d in range(1, doms+1):
-    geo.SetMaterial(d, 'top')
-
-# generate mesh on top geometry
-netmesh = geo.GenerateMesh(maxh=maxh)
-
-# now add a copy of the mesh, translated by yoffset, for visualization of species blue
 yoffset = -1.3
 netmesh = geos.make1DMesh(maxh)
 # netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
