@@ -2,8 +2,6 @@ from netgen.geom2d import SplineGeometry
 from ngsolve import *
 
 from ngsapps.utils import *
-from ngsapps.merge_meshes import *
-from ngsapps.meshtools import *
 from ngsapps.plotting import *
 
 import matplotlib.pyplot as plt
@@ -45,15 +43,9 @@ form = CGFormulation()
 
 conv = False
 
+yoffset = -1.3
 netmesh = geos.make1DMesh(maxh)
-# netmesh = geos.make2DMesh(maxh, geos.square)
-
-if netmesh.dim == 2:
-    # add a copy of the mesh, translated by yoffset, for visualization of species blue
-    yoffset = -1.3
-    netmesh = merge_meshes(netmesh, netmesh, offset2=(0, yoffset, 0), transfer_mats2=False)
-    for d in range(doms+1, nr_materials(netmesh)+1):
-        netmesh.SetMaterial(d, 'bottom')
+# netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
 
 mesh = Mesh(netmesh)
 topMat = mesh.Materials('top')
