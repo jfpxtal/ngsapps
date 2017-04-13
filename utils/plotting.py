@@ -99,9 +99,12 @@ class MPLLine:
         py = self.GetValues(func)
         self.line, = ax.plot(self.mesh.px, py, *args, **kwargs)
 
-    def Redraw(self):
+    def Redraw(self, autoscale=True):
         py = self.GetValues(self.func)
         self.line.set_ydata(py)
+        if autoscale:
+            self.ax.relim()
+            self.ax.autoscale_view()
 
 class MPLTriSurf:
     def __init__(self, mplmesh):
@@ -115,11 +118,14 @@ class MPLTriSurf:
         pz = [func(mip) for mip in self.mesh.mips]
         self.surf = ax.plot_trisurf(self.mesh.triang, pz, *args, **kwargs)
 
-    def Redraw(self):
+    def Redraw(self, autoscale=True):
         self.surf.remove()
         self.Draw(self.func, self.ax, *self.args, **self.kwargs)
+        if autoscale:
+            self.ax.relim()
+            self.ax.autoscale_view()
 
-def Plot(func, ax=None, mplmesh=None, mesh=None, subdivision=1, *args, **kwargs):
+def Plot(func, *args, ax=None, mplmesh=None, mesh=None, subdivision=1, **kwargs):
     if not mplmesh:
         if not mesh:
             # only works for GridFunctions, not CoefficientFunctions

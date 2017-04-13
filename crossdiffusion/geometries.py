@@ -1,4 +1,33 @@
 from netgen.geom2d import unit_square, SplineGeometry
+from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
+                                       FaceDescriptor, Mesh as NetMesh
+from netgen.csg import Pnt
+
+def make1DMesh(maxh):
+    netmesh = NetMesh()
+    netmesh.dim = 1
+    L = 1
+    N = int(L/maxh)+1
+    pnums = []
+    for i in range(0, N + 1):
+        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, 0, 0))))
+
+    for i in range(0, N):
+        netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
+
+    netmesh.Add(Element0D(pnums[0], index=1))
+    netmesh.Add(Element0D(pnums[N], index=2))
+    netmesh.SetMaterial(1, 'top')
+    return netmesh
+
+def make2DMesh(maxh, geoFunc):
+    geo = SplineGeometry()
+    doms = geoFunc(geo)
+    for d in range(1, doms+1):
+        geo.SetMaterial(d, 'top')
+
+    return geo.GenerateMesh(maxh=maxh)
+
 
 # geometries for crossdiffusion
 # return the number of domains used
