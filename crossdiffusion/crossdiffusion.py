@@ -38,8 +38,8 @@ tend = -1
 # jump penalty
 eta = 15
 
-form = CGFormulation()
-# form = DGFormulation(eta)
+# form = CGFormulation()
+form = DGFormulation(eta)
 
 conv = False
 

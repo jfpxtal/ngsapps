@@ -12,6 +12,9 @@ zPar = ParameterLFProxy(2)
 def sqr(x):
     return x*x
 
+def abs(x):
+    return IfPos(x, x, -x)
+
 def norm(x, y):
     return sqrt(sqr(x)+sqr(y))
 

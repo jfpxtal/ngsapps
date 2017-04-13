@@ -1,4 +1,5 @@
 from formulation import *
+from ngsapps.utils import *
 
 class DGFormulation(Formulation):
     def __init__(self, eta):
@@ -6,6 +7,7 @@ class DGFormulation(Formulation):
 
     def FESpace(self, mesh, order):
         # finite element space
+        self.mesh = mesh
         self.fes1 = L2(mesh, order=order, flags={'definedon': ['top']})
         # calculations only on top mesh
         self.fes = FESpace([self.fes1, self.fes1], flags={'definedon': ['top'], 'dgjumps': True})
@@ -20,7 +22,7 @@ class DGFormulation(Formulation):
         Ds = [p.Dr, p.Db]
 
         # special values for DG
-        self.n = specialcf.normal(2)
+        self.n = specialcf.normal(self.mesh.dim)
         self.h = specialcf.mesh_size
 
         self.a = BilinearForm(self.fes)
@@ -43,21 +45,15 @@ class DGFormulation(Formulation):
             - coeff * 0.5 * (grad(test) + grad(test.Other())) * self.n * (trial - trial.Other()),
             skeleton=True)
 
-    def abs(self, x):
-        return IfPos(x, x, -x)
-
-    def posPart(self, x):
-        return IfPos(x, x, 0)
-
     # upwind scheme for advection
     def addUpwind(self, adv, trial, test):
         self.a += SymbolicBFI(-trial * adv * grad(test))
         self.a += SymbolicBFI(
             adv * self.n * 0.5 * (trial + trial.Other()) * (test - test.Other())
-            + 0.5 * self.abs(adv * self.n) * (trial - trial.Other()) * (test - test.Other()),
+            + 0.5 * abs(adv * self.n) * (trial - trial.Other()) * (test - test.Other()),
             skeleton=True)
 
-        self.a += SymbolicBFI(self.posPart(adv * self.n) * trial * test, BND, skeleton=True)
+        self.a += SymbolicBFI(posPart(adv * self.n) * trial * test, BND, skeleton=True)
 
     def __str__(self):
         return 'DG_eta' + str(self.eta)
