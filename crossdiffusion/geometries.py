@@ -9,11 +9,12 @@ from ngsapps.meshtools import *
 def make1DMesh(maxh):
     netmesh = NetMesh()
     netmesh.dim = 1
-    L = 1
+    start = -1
+    L = 2
     N = int(L/maxh)+1
     pnums = []
     for i in range(0, N + 1):
-        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, 0, 0))))
+        pnums.append(netmesh.Add(MeshPoint(Pnt(start + L * i / N, 0, 0))))
 
     for i in range(0, N):
         netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
