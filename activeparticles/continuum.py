@@ -1,9 +1,12 @@
 from ngsolve import *
 from netgen.geom2d import SplineGeometry, unit_square
 from ngsapps.utils import *
+import settings
 
 order = 3
 maxh = 7
+
+vtkoutput = False
 
 # time step and end
 tau = 0.01
@@ -31,20 +34,15 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-# local propulsion speed
-# not sure about v0
-# Router: leave space between annulus and domain boundary?
-v = AnnulusSpeedCF(Rinner=50, Router=100, phi0=50, vout=0.05, v0=0.2)
+# mesh, v = settings.annulusInPeriodicSquare(order, maxh)
+mesh, v = settings.annulus(order, maxh)
 vdx = v.Dx()
 vdy = v.Dy()
 gradv = CoefficientFunction((vdx, vdy))
 
-geo = SplineGeometry()
-MakePeriodicRectangle(geo, (-100, -100), (100, 100))
-mesh = Mesh(geo.GenerateMesh(maxh=maxh))
-
-fes1 = Periodic(H1(mesh, order=order))
-fes = FESpace([fes1, fes1, fes1])
+fesRho = Periodic(H1(mesh, order=order))
+fesW = Periodic(H1(mesh, order=order-1))
+fes = FESpace([fesRho, fesW, fesW])
 
 rho, Wx, Wy = fes.TrialFunction()
 trho, tWx, tWy = fes.TestFunction()
@@ -59,14 +57,19 @@ gradWx = CoefficientFunction((Wxdx, Wxdy))
 gradWy = CoefficientFunction((Wydx, Wydy))
 
 tW = CoefficientFunction((tWx, tWy))
-divtW = grad(tWx)[0] + grad(tWy)[1]
+tWxdx = grad(tWx)[0]
+tWxdy = grad(tWx)[1]
+tWydx = grad(tWy)[0]
+tWydy = grad(tWy)[1]
+divtW = tWxdx + tWydy
+gradtWx = CoefficientFunction((tWxdx, tWxdy))
+gradtWy = CoefficientFunction((tWydx, tWydy))
 
 g = GridFunction(fes)
 grho, gWx, gWy = g.components
 gW = CoefficientFunction((gWx, gWy))
 vbar = v * exp(-alpha*grho)
 gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar
-# is this correct?
 WdotdelW = CoefficientFunction((gW*gradWx, gW*gradWy))
 gradnormWsq = 2*gWx*gradWx + 2*gWy*gradWy
 
@@ -83,11 +86,15 @@ a = BilinearForm(fes)
 # equation for rho
 # TODO: boundary terms from partial integration?
 # TODO: separate terms which need to be reassembled at every time step
-a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
+a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
+# a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
 
-# equation for W
+# # equation for W
+# a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
+#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
+#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
-                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
+                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*gradWx*gradtWx - k*gradWy*gradtWy
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 
 m = BilinearForm(fes)
@@ -103,6 +110,10 @@ Draw(vdx, mesh, 'vdx')
 Draw(v, mesh, 'v')
 Draw(gW, mesh, 'W')
 Draw(grho, mesh, 'rho')
+
+if vtkoutput:
+    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2]],names=["rho", "Wx", "Wy"], filename="instab/instab",subdivision=3)
+    vtk.Do()
 
 input("Press any key...")
 t = 0.0
@@ -120,4 +131,7 @@ with TaskManager():
         g.vec.data = invmat * rhs
 
         Redraw(blocking=False)
-        # input()
+        # if t > 12:
+        #     input()
+        if vtkoutput:
+            vtk.Do()

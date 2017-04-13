@@ -2,19 +2,18 @@ from netgen.geom2d import SplineGeometry
 from ngsolve import *
 
 from ngsapps.utils import *
-from ngsapps.merge_meshes import *
-from ngsapps.meshtools import *
+from ngsapps.plotting import *
 
 import matplotlib.pyplot as plt
 
-import geometries
+import geometries as geos
 from stationary import *
 from dgform import DGFormulation
 from cgform import CGFormulation
 
 
 order = 3
-maxh = 0.3
+maxh = 0.1
 
 convOrder = 3
 
@@ -53,9 +52,8 @@ netmesh = geo.GenerateMesh(maxh=maxh)
 
 # now add a copy of the mesh, translated by yoffset, for visualization of species blue
 yoffset = -1.3
-netmesh = merge_meshes(netmesh, netmesh, offset2=(0, yoffset, 0), transfer_mats2=False)
-for d in range(doms+1, nr_materials(netmesh)+1):
-    netmesh.SetMaterial(d, 'bottom')
+netmesh = geos.make1DMesh(maxh)
+# netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
 
 mesh = Mesh(netmesh)
 topMat = mesh.Materials('top')
@@ -114,20 +112,30 @@ binfty = rbinfty.components[1]
 rhs = p.s.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-# Draw(r2, mesh, 'r')
-# Draw(b2, mesh, 'b')
-# visualize both species at the same time, red in top mesh, blue in bottom
-# translate density b2 of blue species to bottom mesh
-both = r2 + Compose((x, y-yoffset), b2, mesh)
-both2 = rinfty + Compose((x, y-yoffset), binfty, mesh)
-Draw(both2, mesh, 'stationary')
-Draw(both, mesh, 'dynamic')
+if netmesh.dim == 1:
+    plt.gcf().canvas.set_window_title('stationary')
+    Plot(rinfty, 'r')
+    Plot(binfty, 'b')
+    plt.figure('dynamic')
+    rplot = Plot(r2, 'r')
+    bplot = Plot(b2, 'b')
+    plt.show(block=False)
+else:
+    # Draw(r2, mesh, 'r')
+    # Draw(b2, mesh, 'b')
+    # visualize both species at the same time, red in top mesh, blue in bottom
+    # translate density b2 of blue species to bottom mesh
+    both = r2 + Compose((x, y-yoffset), b2, mesh)
+    both2 = rinfty + Compose((x, y-yoffset), binfty, mesh)
+    Draw(both2, mesh, 'stationary')
+    Draw(both, mesh, 'dynamic')
 
 
 times = [0.0]
 entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
 ents = [Integrate(entropy, mesh, definedon=topMat)]
 fig, ax = plt.subplots()
+fig.canvas.set_window_title('entropy')
 line, = ax.plot(times, ents)
 plt.show(block=False)
 
@@ -155,7 +163,12 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         p.s.vec.data = invmat * rhs
 
-        Redraw(blocking=False)
+        if netmesh.dim == 1:
+            rplot.Redraw()
+            bplot.Redraw()
+            plt.pause(0.05)
+        else:
+            Redraw(blocking=False)
 
         ent = Integrate(entropy, mesh, definedon=topMat)
         l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
@@ -170,8 +183,6 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
-
-        # input()
 
 outfile.close()
 

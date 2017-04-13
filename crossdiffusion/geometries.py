@@ -1,7 +1,50 @@
 from netgen.geom2d import unit_square, SplineGeometry
+from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
+                                       FaceDescriptor, Mesh as NetMesh
+from netgen.csg import Pnt
+
+from ngsapps.merge_meshes import *
+from ngsapps.meshtools import *
+
+def make1DMesh(maxh):
+    netmesh = NetMesh()
+    netmesh.dim = 1
+    L = 1
+    N = int(L/maxh)+1
+    pnums = []
+    for i in range(0, N + 1):
+        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, 0, 0))))
+
+    for i in range(0, N):
+        netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
+
+    # netmesh.Add(Element0D(pnums[0], index=1))
+    # netmesh.Add(Element0D(pnums[N], index=2))
+    netmesh.SetMaterial(1, 'top')
+    return netmesh
+
+def make2DMesh(maxh, yoffset, geoFunc):
+    geo = SplineGeometry()
+    doms = geoFunc(geo)
+    for d in range(1, doms+1):
+        geo.SetMaterial(d, 'top')
+
+    netmesh = geo.GenerateMesh(maxh=maxh)
+
+    # add a copy of the mesh, translated by yoffset, for visualization of species blue
+    netmesh = merge_meshes(netmesh, netmesh, offset2=(0, yoffset, 0), transfer_mats2=False)
+    for d in range(doms+1, nr_materials(netmesh)+1):
+        netmesh.SetMaterial(d, 'bottom')
+    return netmesh
+
 
 # geometries for crossdiffusion
 # return the number of domains used
+
+def square(geo):
+    geo.AddRectangle((0, 0), (1, 1))
+
+    return 1
 
 def window(geo):
     geo.AddRectangle((0, 0), (2, 1), leftdomain=1)
