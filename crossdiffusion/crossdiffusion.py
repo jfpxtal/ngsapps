@@ -22,20 +22,20 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-p.Dr = 0.1
+p.Dr = 0.01
 # blue species
-p.Db = 0.3
+p.Db = 0.03
 
 # advection potentials
 p.Vr = -x+sqr(y-0.5)
 p.Vb = x+sqr(y-0.5)
 
 # time step and end
-tau = 0.05
+tau = 0.005
 tend = -1
 
 # jump penalty
-eta = 15
+eta = 10
 
 # form = CGFormulation()
 form = DGFormulation(eta)
@@ -44,7 +44,7 @@ conv = False
 
 # geometry and mesh
 geo = SplineGeometry()
-doms = geometries.patchClamp(geo)
+doms = geometries.window(geo)
 for d in range(1, doms+1):
     geo.SetMaterial(d, 'top')
 

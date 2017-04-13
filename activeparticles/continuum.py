@@ -6,7 +6,7 @@ order = 3
 maxh = 7
 
 # time step and end
-tau = 1
+tau = 0.01
 tend = -1
 
 # diffusion coefficient for rho
