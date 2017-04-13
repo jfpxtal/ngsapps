@@ -22,9 +22,9 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-p.Dr = 0.05
+p.Dr = 0.01
 # blue species
-p.Db = 0.15
+p.Db = 0.03
 # p.Dr = 0.004
 # p.Db = 0.001
 
@@ -34,17 +34,27 @@ p.Db = 0.15
 p.Vr = p.Vb = IfPos(x-0.5, sqr(x-0.5), IfPos(x+0.5, 0, sqr(x+0.5)))
 
 # time step and end
-tau = 0.05
+tau = 0.005
 tend = -1
 
 # jump penalty
-eta = 15
+eta = 10
 
 # form = CGFormulation()
 form = DGFormulation(eta)
 
 conv = False
 
+# geometry and mesh
+geo = SplineGeometry()
+doms = geometries.window(geo)
+for d in range(1, doms+1):
+    geo.SetMaterial(d, 'top')
+
+# generate mesh on top geometry
+netmesh = geo.GenerateMesh(maxh=maxh)
+
+# now add a copy of the mesh, translated by yoffset, for visualization of species blue
 yoffset = -1.3
 netmesh = geos.make1DMesh(maxh)
 # netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
