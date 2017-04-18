@@ -14,7 +14,7 @@ from cgform import CGFormulation
 
 
 order = 1
-maxh = 0.1
+maxh = 0.07
 
 convOrder = 3
 
@@ -22,11 +22,13 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-p.Dr = 0.01
+# p.Dr = 0.01
 # blue species
-p.Db = 0.03
-# p.Dr = 0.004
-# p.Db = 0.001
+# p.Db = 0.03
+p.Dr = 0.004
+p.Db = 0.001
+# p.Dr = 0.15
+# p.Db = 0.05
 
 # advection potentials
 # p.Vr = -x+sqr(y-0.5)
@@ -34,7 +36,7 @@ p.Db = 0.03
 p.Vr = p.Vb = IfPos(x-0.5, sqr(x-0.5), IfPos(x+0.5, 0, sqr(x+0.5)))
 
 # time step and end
-tau = 0.005
+tau = 0.05
 tend = -1
 
 # jump penalty
@@ -50,12 +52,12 @@ netmesh = geos.make1DMesh(maxh)
 # netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
 
 mesh = Mesh(netmesh)
-topMat = mesh.Materials('top')
+topMat = mesh.Materials('top.*')
 
 Plot(p.Vr, mesh=mesh)
 plt.figure()
 
-fes1, fes = form.FESpace(mesh, order)
+fes1, fes = form.FESpace(mesh, topMat, order)
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
 
@@ -144,6 +146,7 @@ outfile.write('time, entropy, l2sq_to_equi_r, l2sq_to_equi_b\n')
 input("Press any key...")
 # semi-implicit Euler
 t = 0.0
+k = 0
 with TaskManager():
     while tend < 0 or t < tend - tau / 2:
         print("\nt = {:10.6e}".format(t))
@@ -163,13 +166,14 @@ with TaskManager():
         p.s.vec.data = invmat * rhs
 
         # flux limiters
-        # stabilityLimiter(r2, mesh, rplot)
-        # stabilityLimiter(b2, mesh, bplot)
+        stabilityLimiter(r2, rplot)
+        stabilityLimiter(b2, bplot)
 
         if netmesh.dim == 1:
-            rplot.Redraw()
-            bplot.Redraw()
-            plt.pause(0.05)
+            if k % 20 == 0:
+                rplot.Redraw()
+                bplot.Redraw()
+                plt.pause(0.05)
         else:
             Redraw(blocking=False)
 
@@ -186,6 +190,8 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
+
+        k += 1
 
 outfile.close()
 

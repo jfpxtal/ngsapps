@@ -19,15 +19,17 @@ def minmod(a1, a2, a3, h):
     else:
         return 0
 
-def stabilityLimiter(g, mesh, p):
+def stabilityLimiter(g, p):
+    fes = g.__getstate__()[0]
+    mesh = fes.__getstate__()[1]
     ints = Integrate(g, mesh, element_wise=True)
     els = []
-    for e in mesh.Elements():
-        trafo = mesh.GetTrafo(e)
+    for e in fes.Elements():
+        trafo = e.GetTrafo()
         elmips = sorted([trafo(0), trafo(1)], key=lambda mip: mip.point[0])
         size = elmips[1].point[0]-elmips[0].point[0]
         left, right = g(elmips[0]), g(elmips[1])
-        els.append({'nr': e.nr,
+        els.append({'dofs': e.dofs,
                     'midpoint': trafo(0.5).point[0],
                     'left': left,
                     'right': right,
@@ -36,22 +38,21 @@ def stabilityLimiter(g, mesh, p):
                     'size': size})
 
     els = sorted(els, key=lambda el: el['midpoint'])
-    # print(els)
 
+    setgf = GridFunction(fes)
     # TODO: think about boundary conditions
     for i in range(1, len(els)-1):
-        input()
+        # input()
         el = els[i]
-        mask = BitArray(len(els))
-        mask.Clear()
-        mask.Set(el['nr'])
-        # doesn't work, Region is not element wise
-        g.Set(el['avg'] + (x-el['midpoint'])*minmod(el['slope'],
+        setgf.Set(el['avg'] + (x-el['midpoint'])*minmod(el['slope'],
                                                     (el['avg']-els[i-1]['avg'])/(el['size']/2),
                                                     (els[i+1]['avg']-el['avg'])/(el['size']/2), el['size']),
-              definedon=Region(mask))
-        p.Redraw()
-        plt.pause(0.05)
+              definedon=Region(mesh, VOL, 'top'+str(i+1)))
+
+        for d in el['dofs']:
+            g.vec[d] = setgf.vec[d]
+        # p.Redraw()
+        # plt.pause(0.05)
 
         # higher order
         ## right = el.avg + minmod(el.right-el.avg, el.avg-els[i-1].avg, els[i+1].avg-el.avg)

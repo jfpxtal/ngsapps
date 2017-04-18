@@ -116,6 +116,7 @@ def stationarySols(p, fes, mat):
         print()
         raise RuntimeError('Root finder did not converge!')
     uvinfty = optres.x
+    print(uvinfty)
 
     rinfty.Set(exp((uvinfty[0]-p.Vr)/p.Dr) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
     binfty.Set(exp((uvinfty[1]-p.Vb)/p.Db) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
