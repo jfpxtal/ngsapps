@@ -13,7 +13,7 @@ from dgform import DGFormulation
 from cgform import CGFormulation
 
 
-order = 1
+order = 3
 maxh = 0.07
 
 convOrder = 3
@@ -25,10 +25,10 @@ p = CrossDiffParams()
 # p.Dr = 0.01
 # blue species
 # p.Db = 0.03
-p.Dr = 0.004
-p.Db = 0.001
-# p.Dr = 0.15
-# p.Db = 0.05
+# p.Dr = 0.004
+# p.Db = 0.001
+p.Dr = 0.15
+p.Db = 0.05
 
 # advection potentials
 # p.Vr = -x+sqr(y-0.5)
@@ -118,8 +118,8 @@ if netmesh.dim == 1:
     Plot(rinfty, 'r', subdivision=0)
     Plot(binfty, 'b', subdivision=0)
     plt.figure('dynamic')
-    rplot = Plot(r2, 'r', subdivision=0)
-    bplot = Plot(b2, 'b', subdivision=0)
+    rplot = Plot(r2, 'r', subdivision=4)
+    bplot = Plot(b2, 'b', subdivision=4)
     plt.show(block=False)
 else:
     # Draw(r2, mesh, 'r')
@@ -166,8 +166,8 @@ with TaskManager():
         p.s.vec.data = invmat * rhs
 
         # flux limiters
-        stabilityLimiter(r2, rplot)
-        stabilityLimiter(b2, bplot)
+        stabilityLimiter(r2, form, topMat, rplot)
+        stabilityLimiter(b2, form, topMat, bplot)
 
         if netmesh.dim == 1:
             if k % 20 == 0:

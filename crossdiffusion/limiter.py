@@ -19,46 +19,65 @@ def minmod(a1, a2, a3, h):
     else:
         return 0
 
-def stabilityLimiter(g, p):
+def limitValues(leftElVals, thisElVals, rightElVals, size):
+    newLVal = thisElVals['avg'] - minmod(thisElVals['avg']-thisElVals['lval'],
+                                         thisElVals['avg']-leftElVals['avg'],
+                                         rightElVals['avg']-thisElVals['avg'], size)
+    newRVal = thisElVals['avg'] + minmod(thisElVals['rval']-thisElVals['avg'],
+                                         thisElVals['avg']-leftElVals['avg'],
+                                         rightElVals['avg']-thisElVals['avg'], size)
+    return newLVal, newRVal
+
+def stabilityLimiter(g, dgform, mat, p):
     fes = g.__getstate__()[0]
     mesh = fes.__getstate__()[1]
+    p1fes,_ = dgform.FESpace(mesh, mat, 1)
+    p1gf = GridFunction(p1fes)
+    p1gf.Set(g)
     ints = Integrate(g, mesh, element_wise=True)
     els = []
     for e in fes.Elements():
         trafo = e.GetTrafo()
         elmips = sorted([trafo(0), trafo(1)], key=lambda mip: mip.point[0])
         size = elmips[1].point[0]-elmips[0].point[0]
-        left, right = g(elmips[0]), g(elmips[1])
+        lval, rval = g(elmips[0]), g(elmips[1])
+        p1lval, p1rval = p1gf(elmips[0]), p1gf(elmips[1])
         els.append({'dofs': e.dofs,
                     'midpoint': trafo(0.5).point[0],
-                    'left': left,
-                    'right': right,
-                    'avg': ints[e.nr]/size,
-                    'slope': (right-left)/size,
+                    'left': elmips[0].point[0],
+                    'orig': {
+                        'lval': lval,
+                        'rval': rval,
+                        'avg': ints[e.nr]/size
+                        },
+                    'p1': {
+                        'lval': p1lval,
+                        'rval': p1rval,
+                        'avg': (p1lval+p1rval)/2
+                        },
                     'size': size})
 
     els = sorted(els, key=lambda el: el['midpoint'])
 
     setgf = GridFunction(fes)
+
     # TODO: think about boundary conditions
     for i in range(1, len(els)-1):
         # input()
         el = els[i]
-        setgf.Set(el['avg'] + (x-el['midpoint'])*minmod(el['slope'],
-                                                    (el['avg']-els[i-1]['avg'])/(el['size']/2),
-                                                    (els[i+1]['avg']-el['avg'])/(el['size']/2), el['size']),
-              definedon=Region(mesh, VOL, 'top'+str(i+1)))
-
-        for d in el['dofs']:
-            g.vec[d] = setgf.vec[d]
-        # p.Redraw()
-        # plt.pause(0.05)
 
         # higher order
-        ## right = el.avg + minmod(el.right-el.avg, el.avg-els[i-1].avg, els[i+1].avg-el.avg)
-        ## left = el.avg - minmod(el.right-el.avg, el.avg-els[i-1].avg, els[i+1].avg-el.avg)
-        ## if left != el.left or right != el.right:
-        ##     # l2 project etc
+        testlval, testrval = limitValues(els[i-1]['orig'], els[i]['orig'], els[i+1]['orig'], els[i]['size'])
+        if testlval != els[i]['orig']['lval'] or testrval != els[i]['orig']['rval']:
+            newlval, newrval = limitValues(els[i-1]['p1'], els[i]['p1'], els[i+1]['p1'], els[i]['size'])
+            setgf.Set(newlval + (x-els[i]['left'])*(newrval-newlval)/els[i]['size'],
+                      definedon=Region(mesh, VOL, 'top'+str(i+1)))
+
+            for d in el['dofs']:
+                g.vec[d] = setgf.vec[d]
+
+        # p.Redraw()
+        # plt.pause(0.05)
 
 
 def nonnegativityLimiter():
