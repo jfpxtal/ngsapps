@@ -13,7 +13,7 @@ from dgform import DGFormulation
 from cgform import CGFormulation
 
 
-order = 3
+order = 1
 maxh = 0.07
 
 convOrder = 3
@@ -25,10 +25,10 @@ p = CrossDiffParams()
 # p.Dr = 0.01
 # blue species
 # p.Db = 0.03
-# p.Dr = 0.004
-# p.Db = 0.001
-p.Dr = 0.15
-p.Db = 0.05
+p.Dr = 0.004
+p.Db = 0.001
+# p.Dr = 0.15
+# p.Db = 0.05
 
 # advection potentials
 # p.Vr = -x+sqr(y-0.5)
@@ -168,6 +168,8 @@ with TaskManager():
         # flux limiters
         stabilityLimiter(r2, form, topMat, rplot)
         stabilityLimiter(b2, form, topMat, bplot)
+        nonnegativityLimiter(r2, rplot)
+        nonnegativityLimiter(b2, bplot)
 
         if netmesh.dim == 1:
             if k % 20 == 0:

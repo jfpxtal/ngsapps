@@ -80,5 +80,33 @@ def stabilityLimiter(g, dgform, mat, p):
         # plt.pause(0.05)
 
 
-def nonnegativityLimiter():
-    pass
+def nonnegativityLimiter(g, p):
+    fes = g.__getstate__()[0]
+    mesh = fes.__getstate__()[1]
+    setgf = GridFunction(fes)
+    els = []
+    for i, e in enumerate(fes.Elements()):
+        trafo = e.GetTrafo()
+        elmips = sorted([trafo(0), trafo(1)], key=lambda mip: mip.point[0])
+        midpoint = trafo(0.5).point[0]
+        size = elmips[1].point[0]-elmips[0].point[0]
+        lval, rval = g(elmips[0]), g(elmips[1])
+        avg = (lval + rval) / 2
+        if lval < 0 or rval < 0:
+            # print('nonnegativityLimiter', e.nr)
+            # input()
+            if lval < 0:
+                setgf.Set((1+2/size*(x-midpoint))*avg,
+                        definedon=Region(mesh, VOL, 'top'+str(i+1)))
+            elif rval < 0:
+                setgf.Set((1-2/size*(x-midpoint))*avg,
+                        definedon=Region(mesh, VOL, 'top'+str(i+1)))
+
+            for d in e.dofs:
+                g.vec[d] = setgf.vec[d]
+
+            # p.Redraw()
+            # plt.pause(0.05)
+
+    els = sorted(els, key=lambda el: el['midpoint'])
+
