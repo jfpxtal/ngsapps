@@ -28,7 +28,7 @@ def limitValues(leftElVals, thisElVals, rightElVals, size):
                                          rightElVals['avg']-thisElVals['avg'], size)
     return newLVal, newRVal
 
-def stabilityLimiter(g, dgform, mat, p):
+def stabilityLimiter(g, dgform, mat, plot):
     fes = g.__getstate__()[0]
     mesh = fes.__getstate__()[1]
     p1fes,_ = dgform.FESpace(mesh, mat, 1)
@@ -76,37 +76,54 @@ def stabilityLimiter(g, dgform, mat, p):
             for d in el['dofs']:
                 g.vec[d] = setgf.vec[d]
 
-        # p.Redraw()
+        # plot.Redraw()
         # plt.pause(0.05)
 
+from ngsolve.fem import BaseMappedIntegrationPoint
 
-def nonnegativityLimiter(g, p):
+def nonnegativityLimiter(g, dgform, mat, plot):
     fes = g.__getstate__()[0]
     mesh = fes.__getstate__()[1]
+    p1fes,_ = dgform.FESpace(mesh, mat, 1)
+    p1gf = GridFunction(p1fes)
+    p1gf.Set(g)
     setgf = GridFunction(fes)
     els = []
     for i, e in enumerate(fes.Elements()):
         trafo = e.GetTrafo()
         elmips = sorted([trafo(0), trafo(1)], key=lambda mip: mip.point[0])
-        midpoint = trafo(0.5).point[0]
-        size = elmips[1].point[0]-elmips[0].point[0]
         lval, rval = g(elmips[0]), g(elmips[1])
-        avg = (lval + rval) / 2
-        if lval < 0 or rval < 0:
+
+        ir = IntegrationRule(e.type, fes.globalorder)
+        negative = False
+        for p in ir:
+            if g(trafo(p)) < 0:
+                negative = True
+                break
+        if negative or lval < 0 or rval < 0:
             # print('nonnegativityLimiter', e.nr)
             # input()
-            if lval < 0:
+            # setgf.Set(p1gf,
+            #         definedon=Region(mesh, VOL, 'top'+str(i+1)))
+            # for d in e.dofs:
+            #     g.vec[d] = setgf.vec[d]
+
+            # plot.Redraw()
+            # plt.pause(0.05)
+            # input()
+            midpoint = trafo(0.5).point[0]
+            size = elmips[1].point[0]-elmips[0].point[0]
+            p1lval, p1rval = p1gf(elmips[0]), p1gf(elmips[1])
+            avg = (p1lval + p1rval) / 2
+            if p1lval < 0:
                 setgf.Set((1+2/size*(x-midpoint))*avg,
                         definedon=Region(mesh, VOL, 'top'+str(i+1)))
-            elif rval < 0:
+            elif p1rval < 0:
                 setgf.Set((1-2/size*(x-midpoint))*avg,
                         definedon=Region(mesh, VOL, 'top'+str(i+1)))
 
             for d in e.dofs:
                 g.vec[d] = setgf.vec[d]
 
-            # p.Redraw()
+            # plot.Redraw()
             # plt.pause(0.05)
-
-    els = sorted(els, key=lambda el: el['midpoint'])
-

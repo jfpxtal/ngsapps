@@ -13,7 +13,7 @@ from dgform import DGFormulation
 from cgform import CGFormulation
 
 
-order = 1
+order = 3
 maxh = 0.07
 
 convOrder = 3
@@ -69,8 +69,8 @@ b2 = p.s.components[1]
 # b2.Set(IfPos(x-1.8, 0.6, 0))
 # r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 # b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
-#r2.Set(0.5+0*x)
-#b2.Set(0.5+0*x)
+# r2.Set(0.49+0*x)
+# b2.Set(0.49+0*x)
 r2.Set(RandomCF(0, 0.49))
 b2.Set(RandomCF(0, 0.49))
 
@@ -168,16 +168,8 @@ with TaskManager():
         # flux limiters
         stabilityLimiter(r2, form, topMat, rplot)
         stabilityLimiter(b2, form, topMat, bplot)
-        nonnegativityLimiter(r2, rplot)
-        nonnegativityLimiter(b2, bplot)
-
-        if netmesh.dim == 1:
-            if k % 20 == 0:
-                rplot.Redraw()
-                bplot.Redraw()
-                plt.pause(0.05)
-        else:
-            Redraw(blocking=False)
+        nonnegativityLimiter(r2, form, topMat, rplot)
+        nonnegativityLimiter(b2, form, topMat, bplot)
 
         ent = Integrate(entropy, mesh, definedon=topMat)
         l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
@@ -192,6 +184,15 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
+
+        if netmesh.dim == 1:
+            if k % 20 == 0:
+                rplot.Redraw()
+                bplot.Redraw()
+                plt.pause(0.05)
+                print(ent)
+        else:
+            Redraw(blocking=False)
 
         k += 1
 
