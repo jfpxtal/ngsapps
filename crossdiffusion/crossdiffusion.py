@@ -14,7 +14,7 @@ from cgform import CGFormulation
 
 
 order = 3
-maxh = 0.07
+maxh = 0.01
 
 convOrder = 3
 
@@ -25,8 +25,8 @@ p = CrossDiffParams()
 # p.Dr = 0.01
 # blue species
 # p.Db = 0.03
-p.Dr = 0.004
-p.Db = 0.001
+p.Dr = 0.0004
+p.Db = 0.0001
 # p.Dr = 0.15
 # p.Db = 0.05
 
@@ -69,8 +69,8 @@ b2 = p.s.components[1]
 # b2.Set(IfPos(x-1.8, 0.6, 0))
 # r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 # b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
-# r2.Set(0.49+0*x)
-# b2.Set(0.49+0*x)
+# r2.Set(0.5+0.49*x)
+# b2.Set(0.5-0.49*x)
 r2.Set(RandomCF(0, 0.49))
 b2.Set(RandomCF(0, 0.49))
 

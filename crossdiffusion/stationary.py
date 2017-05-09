@@ -17,12 +17,17 @@ class CrossDiffParams:
 def max(x, y):
     return IfPos(x-y, x, y)
 
-def AApply(uv, p, mesh, mat):
+def statCoeffs(uv, p):
     a = (uv[0]-p.Vr)/p.Dr
     b = (uv[1]-p.Vb)/p.Db
 
-    mmr = Integrate(1 / (1+exp(-a)+exp(b-a)), mesh, definedon=mat)
-    mmb = Integrate(1 / (1+exp(-b)+exp(a-b)), mesh, definedon=mat)
+    return (1 / (1+exp(-a)+exp(b-a)), 1 / (1+exp(-b)+exp(a-b)))
+
+def AApply(uv, p, mesh, mat):
+    r, b = statCoeffs(uv, p)
+
+    mmr = Integrate(r, mesh, definedon=mat)
+    mmb = Integrate(b, mesh, definedon=mat)
 
     return (np.hstack((mmr, mmb)))
 
@@ -88,6 +93,7 @@ def AssembleLinearization(uv, p, mesh, mat):
 
     return m
 
+
 def stationarySols(p, fes, mat):
     mesh = fes.__getstate__()[1]
 
@@ -107,18 +113,19 @@ def stationarySols(p, fes, mat):
 
     print('Root finder...', end='')
     for x,y in it.product(np.arange(-1, 1, 0.1), repeat=2):
-        optres = opt.root(J, [x,y], jac=DJ)
+        optres = opt.root(J, [x,y], jac=DJ, options={'xtol': 1e-12})
         if optres.success:
             print('converged with initial guess {}'.format((x, y)))
+            print('x = {}\tfun = {}'.format(optres.x, optres.fun))
             break
         print('.', end='')
     if not optres.success:
         print()
         raise RuntimeError('Root finder did not converge!')
     uvinfty = optres.x
-    print(uvinfty)
 
-    rinfty.Set(exp((uvinfty[0]-p.Vr)/p.Dr) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
-    binfty.Set(exp((uvinfty[1]-p.Vb)/p.Db) / (1+exp((uvinfty[0]-p.Vr)/p.Dr)+exp((uvinfty[1]-p.Vb)/p.Db)))
+    statr, statb = statCoeffs(uvinfty, p)
+    rinfty.Set(statr)
+    binfty.Set(statb)
 
     return rbinfty
