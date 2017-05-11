@@ -9,18 +9,21 @@ from ngsapps.meshtools import *
 def make1DMesh(maxh):
     netmesh = NetMesh()
     netmesh.dim = 1
-    L = 1
+    start = -1
+    L = 2
     N = int(L/maxh)+1
     pnums = []
     for i in range(0, N + 1):
-        pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, 0, 0))))
+        pnums.append(netmesh.Add(MeshPoint(Pnt(start + L * i / N, 0, 0))))
 
     for i in range(0, N):
-        netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
+        netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=i+1))
+        netmesh.SetMaterial(i+1, 'top'+str(i+1))
+        # netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
 
     # netmesh.Add(Element0D(pnums[0], index=1))
     # netmesh.Add(Element0D(pnums[N], index=2))
-    netmesh.SetMaterial(1, 'top')
+    # netmesh.SetMaterial(1, 'top')
     return netmesh
 
 def make2DMesh(maxh, yoffset, geoFunc):

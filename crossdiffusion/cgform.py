@@ -1,11 +1,13 @@
 from formulation import *
 
 class CGFormulation(Formulation):
-    def FESpace(self, mesh, order):
+    def FESpace(self, mesh, mat, order):
         # finite element space
-        self.fes1 = H1(mesh, order=order, flags={'definedon': ['top']})
+        # self.fes1 = H1(mesh, order=order, flags={'definedon': ['top']})
+        self.fes1 = H1(mesh, order=order, definedon=mat)
         # calculations only on top mesh
-        self.fes = FESpace([self.fes1, self.fes1], flags={'definedon': ['top']})
+        # self.fes = FESpace([self.fes1, self.fes1], flags={'definedon': ['top']})
+        self.fes = FESpace([self.fes1, self.fes1])
         return self.fes1, self.fes
 
     def BilinearForm(self, p, velocities):

@@ -9,7 +9,7 @@ maxh = 7
 vtkoutput = False
 
 # time step and end
-tau = 1
+tau = 0.01
 tend = -1
 
 # diffusion coefficient for rho

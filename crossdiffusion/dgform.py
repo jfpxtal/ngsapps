@@ -5,12 +5,14 @@ class DGFormulation(Formulation):
     def __init__(self, eta):
         self.eta = eta
 
-    def FESpace(self, mesh, order):
+    def FESpace(self, mesh, mat, order):
         # finite element space
         self.mesh = mesh
-        self.fes1 = L2(mesh, order=order, flags={'definedon': ['top']})
+        # self.fes1 = L2(mesh, order=order, flags={'definedon': ['top']})
+        self.fes1 = L2(mesh, order=order, definedon=mat)
         # calculations only on top mesh
-        self.fes = FESpace([self.fes1, self.fes1], flags={'definedon': ['top'], 'dgjumps': True})
+        # self.fes = FESpace([self.fes1, self.fes1], flags={'definedon': ['top'], 'dgjumps': True})
+        self.fes = FESpace([self.fes1, self.fes1], flags={'dgjumps': True})
         return self.fes1, self.fes
 
     def BilinearForm(self, p, velocities):

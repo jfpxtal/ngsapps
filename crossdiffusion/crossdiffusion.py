@@ -8,12 +8,13 @@ import matplotlib.pyplot as plt
 
 import geometries as geos
 from stationary import *
+from limiter import *
 from dgform import DGFormulation
 from cgform import CGFormulation
 
 
 order = 3
-maxh = 0.1
+maxh = 0.01
 
 convOrder = 3
 
@@ -21,22 +22,25 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-p.Dr = 0.05
+# p.Dr = 0.01
 # blue species
-p.Db = 0.15
-# p.Dr = 0.0004
-# p.Db = 0.0001
+# p.Db = 0.03
+p.Dr = 0.0004
+p.Db = 0.0001
+# p.Dr = 0.15
+# p.Db = 0.05
 
 # advection potentials
-p.Vr = -x+sqr(y-0.5)
-p.Vb = x+sqr(y-0.5)
+# p.Vr = -x+sqr(y-0.5)
+# p.Vb = x+sqr(y-0.5)
+p.Vr = p.Vb = IfPos(x-0.5, sqr(x-0.5), IfPos(x+0.5, 0, sqr(x+0.5)))
 
 # time step and end
 tau = 0.05
 tend = -1
 
 # jump penalty
-eta = 15
+eta = 10
 
 # form = CGFormulation()
 form = DGFormulation(eta)
@@ -48,9 +52,12 @@ netmesh = geos.make1DMesh(maxh)
 # netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
 
 mesh = Mesh(netmesh)
-topMat = mesh.Materials('top')
+topMat = mesh.Materials('top.*')
 
-fes1, fes = form.FESpace(mesh, order)
+Plot(p.Vr, mesh=mesh)
+plt.figure()
+
+fes1, fes = form.FESpace(mesh, topMat, order)
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
 
@@ -60,10 +67,12 @@ r2 = p.s.components[0]
 b2 = p.s.components[1]
 # r2.Set(IfPos(0.2-x, IfPos(0.5-y, 0.9, 0), 0))
 # b2.Set(IfPos(x-1.8, 0.6, 0))
-r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
-b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
-#r2.Set(0.5+0*x)
-#b2.Set(0.5+0*x)
+# r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
+# b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
+# r2.Set(0.5+0.49*x)
+# b2.Set(0.5-0.49*x)
+r2.Set(RandomCF(0, 0.49))
+b2.Set(RandomCF(0, 0.49))
 
 if conv:
     # convolution
@@ -106,11 +115,11 @@ mstar = m.mat.CreateMatrix()
 
 if netmesh.dim == 1:
     plt.gcf().canvas.set_window_title('stationary')
-    Plot(rinfty, 'r')
-    Plot(binfty, 'b')
+    Plot(rinfty, 'r', subdivision=0)
+    Plot(binfty, 'b', subdivision=0)
     plt.figure('dynamic')
-    rplot = Plot(r2, 'r')
-    bplot = Plot(b2, 'b')
+    rplot = Plot(r2, 'r', subdivision=4)
+    bplot = Plot(b2, 'b', subdivision=4)
     plt.show(block=False)
 else:
     # Draw(r2, mesh, 'r')
@@ -134,9 +143,10 @@ plt.show(block=False)
 outfile = open('order{}_maxh{}_form{}_conv{}.csv'.format(order, maxh, form, conv), 'w')
 outfile.write('time, entropy, l2sq_to_equi_r, l2sq_to_equi_b\n')
 
-# input("Press any key...")
+input("Press any key...")
 # semi-implicit Euler
 t = 0.0
+k = 0
 with TaskManager():
     while tend < 0 or t < tend - tau / 2:
         print("\nt = {:10.6e}".format(t))
@@ -155,12 +165,11 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         p.s.vec.data = invmat * rhs
 
-        if netmesh.dim == 1:
-            rplot.Redraw()
-            bplot.Redraw()
-            plt.pause(0.05)
-        else:
-            Redraw(blocking=False)
+        # flux limiters
+        stabilityLimiter(r2, form, topMat, rplot)
+        stabilityLimiter(b2, form, topMat, bplot)
+        nonnegativityLimiter(r2, form, topMat, rplot)
+        nonnegativityLimiter(b2, form, topMat, bplot)
 
         ent = Integrate(entropy, mesh, definedon=topMat)
         l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
@@ -175,6 +184,17 @@ with TaskManager():
         ax.relim()
         ax.autoscale_view()
         fig.canvas.draw()
+
+        if netmesh.dim == 1:
+            if k % 20 == 0:
+                rplot.Redraw()
+                bplot.Redraw()
+                plt.pause(0.05)
+                print(ent)
+        else:
+            Redraw(blocking=False)
+
+        k += 1
 
 outfile.close()
 
