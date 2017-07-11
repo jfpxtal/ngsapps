@@ -15,10 +15,3 @@ namespace ngfem
     // void Evaluate (const SIMD_BaseMappedIntegrationRule & ir, BareSliceMatrix<SIMD<double>> values) const;
   };
 }
-
-namespace ngstd
-{
-  template <> struct PyWrapperTraits<ngfem::ZLogZCoefficientFunction> {
-    typedef PyWrapperDerived<ngfem::ZLogZCoefficientFunction, ngfem::CoefficientFunction> type;
-  };
-}

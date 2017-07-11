@@ -129,7 +129,7 @@ def Plot(func, *args, ax=None, mplmesh=None, mesh=None, subdivision=1, **kwargs)
     if not mplmesh:
         if not mesh:
             # only works for GridFunctions, not CoefficientFunctions
-            mesh = func.space.__getstate__()[1]
+            mesh = func.space.mesh
         if mesh.dim == 1:
             mplmesh = MPLMesh1D(mesh, subdivision)
         else:

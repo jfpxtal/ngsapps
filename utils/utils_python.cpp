@@ -12,9 +12,9 @@
 
 using namespace ngfem;
 
-typedef PyWrapper<CoefficientFunction> PyCF;
-typedef PyWrapper<ngcomp::FESpace> PyFES;
-typedef PyWrapper<BilinearFormIntegrator> PyBFI;
+typedef shared_ptr<CoefficientFunction> PyCF;
+typedef shared_ptr<ngcomp::FESpace> PyFES;
+typedef shared_ptr<BilinearFormIntegrator> PyBFI;
 PyCF MakeCoefficient (py::object val);
 
 void ExportNgsAppsUtils(py::module &m)
@@ -22,34 +22,34 @@ void ExportNgsAppsUtils(py::module &m)
   cout << "exporting ngsapps.utils"  << endl;
 
   // Export RandomCoefficientFunction to python (name "RandomCF")
-  typedef PyWrapperDerived<RandomCoefficientFunction,CoefficientFunction> PyRCF;
-  py::class_<PyRCF, PyCF>
+  typedef shared_ptr<RandomCoefficientFunction> PyRCF;
+  py::class_<RandomCoefficientFunction, PyRCF, CoefficientFunction>
     (m, "RandomCF")
     .def("__init__",
-         [](PyRCF *instance, double lower, double upper)
+         [](RandomCoefficientFunction *instance, double lower, double upper)
             {
-              new (instance) PyRCF(make_shared<RandomCoefficientFunction> (lower, upper));
+              new (instance) RandomCoefficientFunction(lower, upper);
             },
           py::arg("lower")=0.0, py::arg("upper")=1.0
       );
 
-  typedef PyWrapperDerived<ZLogZCoefficientFunction,CoefficientFunction> PyZLogZ;
-  py::class_<PyZLogZ, PyCF>
+  typedef shared_ptr<ZLogZCoefficientFunction> PyZLogZ;
+  py::class_<ZLogZCoefficientFunction, PyZLogZ, CoefficientFunction>
     (m, "ZLogZCF")
     .def("__init__",
-         [](PyZLogZ *instance, py::object cf)
+         [](ZLogZCoefficientFunction *instance, py::object cf)
          {
-           new (instance) PyZLogZ(make_shared<ZLogZCoefficientFunction>(MakeCoefficient(cf).Get()));
+           new (instance) ZLogZCoefficientFunction(MakeCoefficient(cf));
          }
       );
 
-  typedef PyWrapperDerived<AnnulusSpeedCoefficientFunction, CoefficientFunction> PyAnnulusSpeedCF;
-  py::class_<PyAnnulusSpeedCF,PyCF>
+  typedef shared_ptr<AnnulusSpeedCoefficientFunction> PyAnnulusSpeedCF;
+  py::class_<AnnulusSpeedCoefficientFunction, PyAnnulusSpeedCF, CoefficientFunction>
     (m, "AnnulusSpeedCF", "")
     .def("__init__",
-         [](PyAnnulusSpeedCF *instance, double Rinner, double Router, double phi0, double vout, double v0)
+         [](AnnulusSpeedCoefficientFunction *instance, double Rinner, double Router, double phi0, double vout, double v0)
          {
-           new (instance) PyAnnulusSpeedCF(make_shared<AnnulusSpeedCoefficientFunction>(Rinner, Router, phi0, vout, v0));
+           new (instance) AnnulusSpeedCoefficientFunction(Rinner, Router, phi0, vout, v0);
          },
          py::arg("Rinner"), py::arg("Router"), py::arg("phi0"), py::arg("vout"), py::arg("v0")
       )
@@ -63,41 +63,40 @@ void ExportNgsAppsUtils(py::module &m)
          })
     ;
 
-  typedef PyWrapperDerived<ComposeCoefficientFunction, CoefficientFunction> PyComposeCF;
-  py::class_<PyComposeCF,PyCF>
+  typedef shared_ptr<ComposeCoefficientFunction> PyComposeCF;
+  py::class_<ComposeCoefficientFunction, PyComposeCF, CoefficientFunction>
     (m, "Compose", "compose two coefficient functions, c2 after c1")
     .def ("__init__",
-          [] (PyComposeCF *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma)
+          [] (ComposeCoefficientFunction *instance, py::object c1, py::object c2, shared_ptr<ngcomp::MeshAccess> ma)
           {
-            new (instance) PyComposeCF(make_shared<ComposeCoefficientFunction>(MakeCoefficient(c1).Get(), MakeCoefficient(c2).Get(), ma));
+            new (instance) ComposeCoefficientFunction(MakeCoefficient(c1), MakeCoefficient(c2), ma);
           },
           py::arg("innercf"), py::arg("outercf"), py::arg("mesh")
       );
 
-  typedef PyWrapperDerived<ParameterLFProxy, CoefficientFunction> PyParameterLFProxy;
-  py::class_<PyParameterLFProxy,PyCF>
+  typedef shared_ptr<ParameterLFProxy> PyParameterLFProxy;
+  py::class_<ParameterLFProxy, PyParameterLFProxy, CoefficientFunction>
     (m, "ParameterLFProxy", "xPar, yPar, zPar coordinates for ParameterLF")
     .def("__init__",
-         [](PyParameterLFProxy *instance, int direction)
+         [](ParameterLFProxy *instance, int direction)
          {
-           new (instance) PyParameterLFProxy(make_shared<ParameterLFProxy>(direction));
+           new (instance) ParameterLFProxy(direction);
          })
     ;
 
-  typedef PyWrapperDerived<CompactlySupportedKernel, CoefficientFunction> PyCompactlySupportedKernel;
-  py::class_<PyCompactlySupportedKernel,PyCF>
+  typedef shared_ptr<CompactlySupportedKernel> PyCompactlySupportedKernel;
+  py::class_<CompactlySupportedKernel, PyCompactlySupportedKernel, CoefficientFunction>
     (m, "CompactlySupportedKernel", "")
     .def("__init__",
-         [](PyCompactlySupportedKernel *instance, double radius, double scale)
+         [](CompactlySupportedKernel *instance, double radius, double scale)
          {
-           new (instance) PyCompactlySupportedKernel(make_shared<CompactlySupportedKernel>(radius, scale));
+           new (instance) CompactlySupportedKernel(radius, scale);
          },
          py::arg("radius"), py::arg("scale")=1.0
       );
 
-  typedef PyWrapper<ngcomp::GridFunction> PyGF;
-  typedef PyWrapperDerived<ParameterLinearFormCF, CoefficientFunction> PyParameterLF;
-  py::class_<PyParameterLF,PyCF>
+  typedef shared_ptr<ParameterLinearFormCF> PyParameterLF;
+  py::class_<ParameterLinearFormCF, PyParameterLF, CoefficientFunction>
     (m, "ParameterLF",
       "Parameterized LinearForm\n"
       "This coefficient function calculates the value of the parameterized integral\n"
@@ -106,23 +105,23 @@ void ExportNgsAppsUtils(py::module &m)
       "integrand is a CoefficientFunction which linearly contains a TestFunction from the FESpace to which gf belongs.\n"
       "When calculating the integral, the test function is then replaced by gf.")
     .def ("__init__",
-          [] (PyParameterLF *instance, py::object integrand, PyGF gf, int order, int repeat, vector<double> patchSize)
+          [] (ParameterLinearFormCF *instance, py::object integrand, shared_ptr<ngcomp::GridFunction> gf, int order, int repeat, vector<double> patchSize)
           {
-            new (instance) PyParameterLF(make_shared<ParameterLinearFormCF>(MakeCoefficient(integrand).Get(), gf.Get(), order, repeat, patchSize));
+            new (instance) ParameterLinearFormCF(MakeCoefficient(integrand), gf, order, repeat, patchSize);
           },
           py::arg("integrand"), py::arg("gf"), py::arg("order")=5, py::arg("repeat")=0, py::arg("patchSize")=vector<int>()
       )
     ;
 
-  typedef PyWrapperDerived<ConvolutionCoefficientFunction, CoefficientFunction> PyConvolveCF;
-  py::class_<PyConvolveCF,PyCF>
+  typedef shared_ptr<ConvolutionCoefficientFunction> PyConvolveCF;
+  py::class_<ConvolutionCoefficientFunction, PyConvolveCF, CoefficientFunction>
     (m, "ConvolveCF",
       "convolution of a general coefficient function with a coefficient function representing a kernel\n"
       "to calculate repeated convolutions of GridFunctions, use ParameterLF")
     .def ("__init__",
-          [] (PyConvolveCF *instance, py::object cf, py::object kernel, shared_ptr<ngcomp::MeshAccess> ma, int order)
+          [] (ConvolutionCoefficientFunction *instance, py::object cf, py::object kernel, shared_ptr<ngcomp::MeshAccess> ma, int order)
           {
-            new (instance) PyConvolveCF(make_shared<ConvolutionCoefficientFunction>(MakeCoefficient(cf).Get(), MakeCoefficient(kernel).Get(), ma, order));
+            new (instance) ConvolutionCoefficientFunction(MakeCoefficient(cf), MakeCoefficient(kernel), ma, order);
           },
           py::arg("cf"), py::arg("kernel"), py::arg("mesh"), py::arg("order")=5
       )
@@ -136,13 +135,13 @@ void ExportNgsAppsUtils(py::module &m)
          })
     ;
 
-  typedef PyWrapperDerived<CacheCoefficientFunction, CoefficientFunction> PyCacheCF;
-  py::class_<PyCacheCF,PyCF>
+  typedef shared_ptr<CacheCoefficientFunction> PyCacheCF;
+  py::class_<CacheCoefficientFunction, PyCacheCF, CoefficientFunction>
     (m, "Cache", "cache results of a coefficient function")
     .def ("__init__",
-          [] (PyCacheCF *instance, py::object c, shared_ptr<ngcomp::MeshAccess> ma)
+          [] (CacheCoefficientFunction *instance, py::object c, shared_ptr<ngcomp::MeshAccess> ma)
           {
-            new (instance) PyCacheCF(make_shared<CacheCoefficientFunction>(MakeCoefficient(c).Get(), ma));
+            new (instance) CacheCoefficientFunction(MakeCoefficient(c), ma);
           },
           py::arg("cf"), py::arg("mesh")
       )
@@ -158,24 +157,21 @@ void ExportNgsAppsUtils(py::module &m)
 
   using namespace ngcomp;
 
-  typedef PyWrapper<MyBaseVTKOutput> PyMyVTK;
-  py::class_<PyMyVTK>(m, "MyVTKOutput")
-    .def("__init__",
-         [](PyMyVTK *instance, shared_ptr<MeshAccess> ma, py::list coefs_list,
-            py::list names_list, string filename, int subdivision, int only_element, bool nocache)
+  typedef shared_ptr<MyBaseVTKOutput> PyMyVTK;
+  m.def("MyVTKOutput",
+         [](shared_ptr<MeshAccess> ma, py::list coefs_list,
+            py::list names_list, string filename, int subdivision, int only_element, bool nocache) -> PyMyVTK
                            {
                              Array<shared_ptr<CoefficientFunction> > coefs
-                               = makeCArrayUnpackWrapper<PyCF> (coefs_list);
+                               = makeCArraySharedPtr<shared_ptr<CoefficientFunction>> (coefs_list);
                              Array<string > names
                                = makeCArray<string> (names_list);
-                             shared_ptr<MyBaseVTKOutput> ret;
                              if (ma->GetDimension() == 1)
-                               ret = make_shared<MyVTKOutput<1>> (ma, coefs, names, filename, subdivision, only_element, nocache);
+                               return make_shared<MyVTKOutput<1>> (ma, coefs, names, filename, subdivision, only_element, nocache);
                              else if (ma->GetDimension() == 2)
-                               ret = make_shared<MyVTKOutput<2>> (ma, coefs, names, filename, subdivision, only_element, nocache);
+                               return make_shared<MyVTKOutput<2>> (ma, coefs, names, filename, subdivision, only_element, nocache);
                              else
-                               ret = make_shared<MyVTKOutput<3>> (ma, coefs, names, filename, subdivision, only_element, nocache);
-                             new (instance) PyMyVTK(ret);
+                               return make_shared<MyVTKOutput<3>> (ma, coefs, names, filename, subdivision, only_element, nocache);
                            },
 
             py::arg("ma"),
@@ -185,24 +181,25 @@ void ExportNgsAppsUtils(py::module &m)
             py::arg("subdivision") = 0,
             py::arg("only_element") = -1,
             py::arg("nocache") = false
-      )
+        );
 
-    .def("Do", FunctionPointer([](PyMyVTK & self, int heapsize)
+  py::class_<MyBaseVTKOutput, PyMyVTK>(m, "C_MyVTKOutput")
+    .def("Do", [](PyMyVTK & self, int heapsize)
                                {
                                  LocalHeap lh (heapsize, "VTKOutput-heap");
                                  self->Do(lh);
-                               }),
+                               },
          py::arg("heapsize")=1000000)
-    .def("Do", FunctionPointer([](PyMyVTK & self, const BitArray * drawelems, int heapsize)
+    .def("Do", [](PyMyVTK & self, const BitArray * drawelems, int heapsize)
                                {
                                  LocalHeap lh (heapsize, "VTKOutput-heap");
                                  self->Do(lh, drawelems);
-                               }),
+                               },
          py::arg("drawelems"),py::arg("heapsize")=1000000)
-    .def("UpdateMesh", FunctionPointer([](PyMyVTK & self)
+    .def("UpdateMesh", [](PyMyVTK & self)
                                {
                                  self->BuildGridString();
-                               }))
+                               })
 
     ;
 }

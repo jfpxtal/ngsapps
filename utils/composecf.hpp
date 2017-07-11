@@ -21,10 +21,3 @@ namespace ngfem
     virtual void PrintReport (ostream & ost) const;
   };
 }
-
-namespace ngstd
-{
-  template <> struct PyWrapperTraits<ngfem::ComposeCoefficientFunction> {
-    typedef PyWrapperDerived<ngfem::ComposeCoefficientFunction, ngfem::CoefficientFunction> type;
-  };
-}

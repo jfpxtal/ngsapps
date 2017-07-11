@@ -95,7 +95,7 @@ def AssembleLinearization(uv, p, mesh, mat):
 
 
 def stationarySols(p, fes, mat):
-    mesh = fes.__getstate__()[1]
+    mesh = fes.mesh
 
     # Calculate constant equilibria
     domainSize = Integrate(CoefficientFunction(1), mesh, definedon=mat)
