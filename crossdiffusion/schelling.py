@@ -33,13 +33,13 @@ def CreateBilinearForm(fes, s, gridr,gridb):
 #    a += SymbolicBFI(0.1*(grad(r)*grad(tr)+grad(b)*grad(tb))) # Regularization
     return a
 
-order = 3
-maxh = 0.1
+order = 1
+maxh = 0.02
 
-convOrder = 3
+convOrder = 1
 
 # time step and end
-tau = 0.001
+tau = 0.00001
 tend = -1
 
 
@@ -90,12 +90,12 @@ b2 = p.s.components[1]
 #r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 #b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 freq = 10
-r2.Set(0.2*(sin(freq*x)*sin(freq*y)+1))
-b2.Set(0.2*(cos(freq*x)*cos(freq*y)+1))
+r2.Set(2.0/3*(sin(freq*x)*sin(freq*y)+1))
+b2.Set(1.0/3*(cos(freq*x)*cos(freq*y)+1))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
-cdec = 20
-cdec2 = 0.1
+cdec = 15
+cdec2 = 5
 
 if conv:
     # convolution

@@ -4,7 +4,7 @@
 Created on Thu Jan  5 10:26:14 2017
 
 Solve 
-u_t + div(u\beta) = 0
+u_t + div(u(1-u)\beta) = 0
 
 @author: pietschm
 """
@@ -15,7 +15,7 @@ from ngsolve import *
 import numpy as np
 
 #from geometries import *
-from plotting import *
+from ngsapps.plotting import *
 from limiter import *
 
 
@@ -28,7 +28,7 @@ def make1DMesh(maxh):
     netmesh = NetMesh()
     netmesh.dim = 1
     start = -1
-    L = 2
+    L = 10
     N = int(L/maxh)+1
     pnums = []
     for i in range(0, N + 1):
@@ -44,8 +44,9 @@ def make1DMesh(maxh):
 
 order = 1
 maxh = 0.05
-tau = 0.01
+tau = 0.001
 tend = -1
+
 
 usegeo = "circle"
 usegeo = "1d"
@@ -75,7 +76,7 @@ h = specialcf.mesh_size
 if usegeo == "circle":
     beta = CoefficientFunction((1,0))
 elif usegeo == "1d":
-    beta = CoefficientFunction(1)
+    beta = CoefficientFunction(0.1)
     
 mu = 0.0
 
@@ -83,16 +84,30 @@ mu = 0.0
 aupw = BilinearForm(fes)
 
 # u_t + beta*grad(u) = 0
-#aupw += SymbolicBFI(beta*grad(v)*w)
-#aupw += SymbolicBFI( IfPos(-beta*n,-beta*n,0)*v*w, BND, skeleton=True)
-#aupw += SymbolicBFI(-beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
-#aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+#aupw += SymbolicBFI((1-2*u)*beta*grad(v)*w)
+#aupw += SymbolicBFI( IfPos(-(1-2*u)*beta*n,-(1-2*u)*beta*n,0)*v*w, BND, skeleton=True)
+#aupw += SymbolicBFI(-(1-2*u)*beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
+#aupw += SymbolicBFI(0.5*abs((1-2*u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
 
 # u_t + div(beta*u) = 0
 aupw += SymbolicBFI(-v*(1-u)*beta*grad(w))
 aupw += SymbolicBFI(IfPos((1-u)*beta*n,(1-u)*beta*n,0)*v*w, BND, skeleton=True)
 aupw += SymbolicBFI((1-u)*beta*n* (v + v.Other())*0.5*(w - w.Other()), skeleton=True)
 aupw += SymbolicBFI(0.5*abs((1-u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+
+# Lax Friedrich
+#etaf = abs(beta*n)
+#phi = 0.5*(v*(1-v)*beta*n + v.Other()*(1-v.Other())*beta*n)
+#phi += etaf*(v-v.Other())
+#
+#aupw += SymbolicBFI(-v*(1-v)*beta*grad(w))
+#aupw += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
+#
+#phib = 0.5*(v*(1-u)*beta*n + 0)
+#phib += etaf*(v-0)
+#aupw += SymbolicBFI(phib*(w - w.Other()), BND, skeleton=True)
+#aupw += SymbolicBFI( IfPos(-beta*n,-beta*n,0)*v*w, BND, skeleton=True)
+
 
 
 # mass matrix
@@ -113,7 +128,7 @@ f.Assemble()
 rhs = u.vec.CreateVector()
 mstar = aupw.mat.CreateMatrix()
 
-u.Set(0.8*exp(-(x*x+y*y)))
+u.Set(0.9*exp(-(x*x+y*y)))
 
 if netgenMesh.dim == 1:
     uplot = Plot(u, mesh=mesh)
@@ -135,21 +150,24 @@ with TaskManager():
         aupw.Assemble()
 
         # Explicit
-#        rhs.data = m.mat * u.vec - tau * aupw.mat * u.vec
-#        rhs.data += f.vec
-#        u.vec.data = minv * rhs
+#        aupw.Apply (u.vec, rhs)
+#        rhs.data = (-1*tau)*rhs
+#        rhs.data += m.mat * u.vec
+        rhs.data = m.mat * u.vec - tau * aupw.mat * u.vec
+        rhs.data += f.vec
+        u.vec.data = minv * rhs
         
-        # Implicit
-        rhs.data = m.mat * u.vec
-        mstar.AsVector().data = m.mat.AsVector() + tau * aupw.mat.AsVector()
-        invmat = mstar.Inverse(fes.FreeDofs())
-        u.vec.data = invmat * rhs
+        # Implicits
+#        rhs.data = m.mat * u.vec
+#        mstar.AsVector().data = m.mat.AsVector() + tau * aupw.mat.AsVector()
+#        invmat = mstar.Inverse(fes.FreeDofs())
+#        u.vec.data = invmat * rhs
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
 
         if netgenMesh.dim == 1:
-            if k % 10 == 0:
+            if k % 100 == 0:
                 uplot.Redraw()
                 plt.pause(0.001)
         else:
