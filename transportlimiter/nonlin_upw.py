@@ -18,7 +18,6 @@ import numpy as np
 from ngsapps.plotting import *
 from limiter import *
 
-
 ngsglobals.msg_level = 1
 
 def abs(x):
@@ -84,16 +83,16 @@ mu = 0.0
 aupw = BilinearForm(fes)
 
 # u_t + beta*grad(u) = 0
-#aupw += SymbolicBFI((1-2*u)*beta*grad(v)*w)
-#aupw += SymbolicBFI( IfPos(-(1-2*u)*beta*n,-(1-2*u)*beta*n,0)*v*w, BND, skeleton=True)
-#aupw += SymbolicBFI(-(1-2*u)*beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
-#aupw += SymbolicBFI(0.5*abs((1-2*u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+aupw += SymbolicBFI((1-2*u)*beta*grad(v)*w)
+aupw += SymbolicBFI( IfPos(-(1-2*u)*beta*n,-(1-2*u)*beta*n,0)*v*w, BND, skeleton=True)
+aupw += SymbolicBFI(-(1-2*u)*beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
+aupw += SymbolicBFI(0.5*abs((1-2*u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
 
 # u_t + div(beta*u) = 0
-aupw += SymbolicBFI(-v*(1-u)*beta*grad(w))
-aupw += SymbolicBFI(IfPos((1-u)*beta*n,(1-u)*beta*n,0)*v*w, BND, skeleton=True)
-aupw += SymbolicBFI((1-u)*beta*n* (v + v.Other())*0.5*(w - w.Other()), skeleton=True)
-aupw += SymbolicBFI(0.5*abs((1-u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+#aupw += SymbolicBFI(-v*(1-u)*beta*grad(w))
+#aupw += SymbolicBFI(IfPos((1-u)*beta*n,(1-u)*beta*n,0)*v*w, BND, skeleton=True)
+#aupw += SymbolicBFI((1-u)*beta*n* (v + v.Other())*0.5*(w - w.Other()), skeleton=True)
+#aupw += SymbolicBFI(0.5*abs((1-u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
 
 # Lax Friedrich
 #etaf = abs(beta*n)
@@ -162,7 +161,8 @@ with TaskManager():
 #        mstar.AsVector().data = m.mat.AsVector() + tau * aupw.mat.AsVector()
 #        invmat = mstar.Inverse(fes.FreeDofs())
 #        u.vec.data = invmat * rhs
-
+        stabilityLimiter(u, fes, uplot)
+        nonnegativityLimiter(u, fes, uplot)
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
 
