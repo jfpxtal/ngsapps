@@ -1,5 +1,4 @@
 project(ngsapps)
-
 cmake_minimum_required(VERSION 3.1)
 
 find_package(NGSolve CONFIG REQUIRED
@@ -11,6 +10,6 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${NGSOLVE_INSTALL_DIR}/${NGSOLVE_INSTALL_DIR_PYTHON}/ngsapps CACHE PATH "Install dir" FORCE)
 endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
-message("With 'make install' the python package will be installed to: ${CMAKE_INSTALL_PREFIX}")
+SET(CMAKE_CXX_COMPILER "${NGSOLVE_INSTALL_DIR}/${NGSOLVE_INSTALL_DIR_BIN}/ngscxx")
 
 add_subdirectory(utils)

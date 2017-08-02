@@ -1,4 +1,4 @@
-from ngsapps.ngsapps_utils import *
+from ngsapps.libngsapps_utils import *
 
 from ngsolve import *
 from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
