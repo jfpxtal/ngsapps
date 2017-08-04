@@ -14,7 +14,7 @@ from cgform import CGFormulation
 
 
 order = 3
-maxh = 0.01
+maxh = 0.3
 
 convOrder = 3
 
@@ -22,18 +22,18 @@ p = CrossDiffParams()
 
 # diffusion coefficients
 # red species
-# p.Dr = 0.01
+p.Dr = 0.01
 # blue species
-# p.Db = 0.03
-p.Dr = 0.0004
-p.Db = 0.0001
+p.Db = 0.03
+# p.Dr = 0.0004
+# p.Db = 0.0001
 # p.Dr = 0.15
 # p.Db = 0.05
 
 # advection potentials
-# p.Vr = -x+sqr(y-0.5)
-# p.Vb = x+sqr(y-0.5)
-p.Vr = p.Vb = IfPos(x-0.5, sqr(x-0.5), IfPos(x+0.5, 0, sqr(x+0.5)))
+p.Vr = -x+sqr(y-0.5)
+p.Vb = x+sqr(y-0.5)
+# p.Vr = p.Vb = IfPos(x-0.5, sqr(x-0.5), IfPos(x+0.5, 0, sqr(x+0.5)))
 
 # time step and end
 tau = 0.05
@@ -48,8 +48,8 @@ form = DGFormulation(eta)
 conv = False
 
 yoffset = -1.3
-netmesh = geos.make1DMesh(maxh)
-# netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
+# netmesh = Make1DMesh(-1, 1, maxh)
+netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
 
 mesh = Mesh(netmesh)
 topMat = mesh.Materials('top.*')
@@ -69,10 +69,10 @@ b2 = p.s.components[1]
 # b2.Set(IfPos(x-1.8, 0.6, 0))
 # r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 # b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
-# r2.Set(0.5+0.49*x)
-# b2.Set(0.5-0.49*x)
-r2.Set(RandomCF(0, 0.49))
-b2.Set(RandomCF(0, 0.49))
+r2.Set(0.5+0.49*x)
+b2.Set(0.5-0.49*x)
+# r2.Set(RandomCF(0, 0.49))
+# b2.Set(RandomCF(0, 0.49))
 
 if conv:
     # convolution
@@ -166,10 +166,10 @@ with TaskManager():
         p.s.vec.data = invmat * rhs
 
         # flux limiters
-        stabilityLimiter(r2, form, topMat, rplot)
-        stabilityLimiter(b2, form, topMat, bplot)
-        nonnegativityLimiter(r2, form, topMat, rplot)
-        nonnegativityLimiter(b2, form, topMat, bplot)
+        # stabilityLimiter(r2, form, topMat, rplot)
+        # stabilityLimiter(b2, form, topMat, bplot)
+        # nonnegativityLimiter(r2, form, topMat, rplot)
+        # nonnegativityLimiter(b2, form, topMat, bplot)
 
         ent = Integrate(entropy, mesh, definedon=topMat)
         l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
