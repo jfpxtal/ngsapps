@@ -70,8 +70,7 @@ def stabilityLimiter(g, p1fes, plot):
         testlval, testrval = limitValues(els[i-1]['orig'], els[i]['orig'], els[i+1]['orig'], els[i]['size'])
         if testlval != els[i]['orig']['lval'] or testrval != els[i]['orig']['rval']:
             newlval, newrval = limitValues(els[i-1]['p1'], els[i]['p1'], els[i+1]['p1'], els[i]['size'])
-            setgf.Set(newlval + (x-els[i]['left'])*(newrval-newlval)/els[i]['size'],
-                      definedon=Region(mesh, VOL, 'top'+str(i+1)))
+            setgf.Set(newlval + (x-els[i]['left'])*(newrval-newlval)/els[i]['size'])
 
             for d in el['dofs']:
                 g.vec[d] = setgf.vec[d]
@@ -116,11 +115,10 @@ def nonnegativityLimiter(g, p1fes, plot):
             p1lval, p1rval = p1gf(elmips[0]), p1gf(elmips[1])
             avg = (p1lval + p1rval) / 2
             if p1lval < 0:
-                setgf.Set((1+2/size*(x-midpoint))*avg,
-                        definedon=Region(mesh, VOL, 'top'+str(i+1)))
+                setgf.Set((1+2/size*(x-midpoint))*avg)
+
             elif p1rval < 0:
-                setgf.Set((1-2/size*(x-midpoint))*avg,
-                        definedon=Region(mesh, VOL, 'top'+str(i+1)))
+                setgf.Set((1-2/size*(x-midpoint))*avg)
 
             for d in e.dofs:
                 g.vec[d] = setgf.vec[d]

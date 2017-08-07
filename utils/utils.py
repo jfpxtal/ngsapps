@@ -1,4 +1,4 @@
-from ngsapps.ngsapps_utils import *
+from ngsapps.libngsapps_utils import *
 
 from ngsolve import *
 from netgen.meshing import Element0D, Element1D, Element2D, MeshPoint, \
@@ -20,6 +20,9 @@ def norm(x, y):
 
 def posPart(x):
     return IfPos(x, x, 0)
+
+def negPart(x):
+    return IfPos(-x, -x, 0)
 
 def Lagrange(mesh, **args):
     """
@@ -68,6 +71,25 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
         netmesh.Add(Element1D([pnums[i + M * (N + 1)],
                                pnums[i + 1 + M * (N + 1)]], index=3))
 
+    return netmesh
+
+def Make1DMesh(start, end, maxh):
+    netmesh = NetMesh()
+    netmesh.dim = 1
+    L = end-start
+    N = int(L/maxh)+1
+    pnums = []
+    for i in range(0, N + 1):
+        pnums.append(netmesh.Add(MeshPoint(Pnt(start + L * i / N, 0, 0))))
+
+    for i in range(0, N):
+        netmesh.Add(Element1D([pnums[i], pnums[i + 1]]))
+        # netmesh.SetMaterial(i+1, 'top'+str(i+1))
+        # netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
+
+    # netmesh.Add(Element0D(pnums[0], index=1))
+    # netmesh.Add(Element0D(pnums[N], index=2))
+    netmesh.SetMaterial(1, 'top')
     return netmesh
 
 def MakePeriodicRectangle(geo, p1, p2, bc=None, bcs=None, **args):

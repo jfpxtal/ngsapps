@@ -12,33 +12,12 @@ from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
 from netgen.csg import Pnt
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
+from ngsapps.utils import *
 import numpy as np
 
-#from geometries import *
-from plotting import *
+from ngsapps.plotting import *
 
 ngsglobals.msg_level = 1
-
-def abs(x):
-    return IfPos(x, x, -x)
-
-def make1DMesh(maxh):
-    netmesh = NetMesh()
-    netmesh.dim = 1
-    start = -1
-    L = 2
-    N = int(L/maxh)+1
-    pnums = []
-    for i in range(0, N + 1):
-        pnums.append(netmesh.Add(MeshPoint(Pnt(start + L * i / N, 0, 0))))
-
-    for i in range(0, N):
-        netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=i+1))
-        netmesh.SetMaterial(i+1, 'top'+str(i+1))
-        
-    netmesh.Add(Element0D(pnums[0], index=1))
-    netmesh.Add(Element0D(pnums[N], index=2))
-    return netmesh
 
 order = 3
 maxh = 0.05
@@ -53,7 +32,7 @@ if usegeo == "circle":
     geo.AddCircle ( (0.0, 0.0), r=1, bc="cyl")
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 elif usegeo == "1d":
-    netgenMesh = make1DMesh(maxh)
+    netgenMesh = Make1DMesh(-1, 1, maxh)
 
 mesh = Mesh(netgenMesh)
 #mesh.Curve(order)
@@ -81,16 +60,26 @@ mu = 0.0
 aupw = BilinearForm(fes)
 
 # u_t + beta*grad(u) = 0
-#aupw += SymbolicBFI(beta*grad(v)*w)
-#aupw += SymbolicBFI( IfPos(-beta*n,-beta*n,0)*v*w, BND, skeleton=True)
-#aupw += SymbolicBFI(-beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
-#aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+aupw += SymbolicBFI(beta*grad(v)*w)
+aupw += SymbolicBFI(negPart(beta*n)*v*w, BND, skeleton=True)
+aupw += SymbolicBFI(-beta*n*(v - v.Other())*0.5*(w + w.Other()), skeleton=True)
+aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+
+# centered flux
+# aupw += SymbolicBFI(beta*grad(v)*w)
+# aupw += SymbolicBFI(negPart(beta*n)*v*w, BND, skeleton=True)
+# aupw += SymbolicBFI(-beta*n*(v - v.Other())*0.5*(w + w.Other()), skeleton=True)
 
 # u_t + div(beta*u) = 0
-aupw += SymbolicBFI(-v*beta*grad(w))
-aupw += SymbolicBFI(IfPos(beta*n,beta*n,0)*v*w, BND, skeleton=True)
-aupw += SymbolicBFI(beta*n* (v + v.Other())*0.5*(w - w.Other()), skeleton=True)
-aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+# aupw += SymbolicBFI(-v*beta*grad(w))
+# aupw += SymbolicBFI(posPart(beta*n)*v*w, BND, skeleton=True)
+# aupw += SymbolicBFI(beta*n*(v + v.Other())*0.5*(w - w.Other()), skeleton=True)
+# aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
+
+# centered flux
+# aupw += SymbolicBFI(-v*grad(w))
+# aupw += SymbolicBFI(posPart(n)*v*w, BND, skeleton=True)
+# aupw += SymbolicBFI(n*(v + v.Other())*0.5*(w - w.Other()), skeleton=True)
 
 
 # mass matrix
@@ -145,5 +134,6 @@ with TaskManager():
         if netgenMesh.dim == 1:
             uplot.Redraw()
             plt.pause(0.05)
+            input()
         else:
             Redraw(blocking=False)
