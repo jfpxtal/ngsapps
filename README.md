@@ -1,5 +1,5 @@
 # ngsapps
-This repository contains applications for the [NGSolve finite element library](https://gitlab.asc.tuwien.ac.at/jschoeberl/ngsolve-docu/wikis/home).
+This repository contains applications for the [NGSolve finite element library](https://ngsolve.org/).
 
 ## Models
 <table>
