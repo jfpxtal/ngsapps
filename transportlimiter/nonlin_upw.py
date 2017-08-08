@@ -19,7 +19,7 @@ from rungekutta import *
 
 ngsglobals.msg_level = 1
 
-order = 1
+order = 3
 maxh = 0.01
 tau = 0.01
 tend = -1
@@ -77,9 +77,11 @@ etaf = abs(beta*n)
 phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
 phi += 0.5*etaf*(v-v.Other(0))
 
+phiR = IfPos(beta*n, beta*n*IfPos(u-0.5, 0.25, u*(1-u)), 0)
+
 a += SymbolicBFI(-v*(1-v)*beta*grad(w))
 a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
-a += SymbolicBFI(phi*w, BND, skeleton=True)
+a += SymbolicBFI(phiR*w, BND, skeleton=True)
 
 # semi-implicit (not working yet, GridFunction.Other())
 # etaf = abs(beta*n)
@@ -88,7 +90,7 @@ a += SymbolicBFI(phi*w, BND, skeleton=True)
 
 # a += SymbolicBFI(-v*(1-u)*beta*grad(w))
 # a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
-# a += SymbolicBFI(phi*w, BND, skeleton=True)
+# a += SymbolicBFI(phi*w, BND, skeleton=True) FIXME
 
 
 # mass matrix
@@ -110,6 +112,7 @@ rhs = u.vec.CreateVector()
 # mstar = m.mat.CreateMatrix()
 
 u.Set(0.9*exp(-2*(x*x+y*y)))
+# u.Set(CoefficientFunction(0.4))
 
 if netgenMesh.dim == 1:
     uplot = Plot(u, mesh=mesh, subdivision=3)
@@ -137,6 +140,7 @@ with TaskManager():
 
         # Explicit
         # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
+        # TODO: limit after each interior Euler step!
         u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
 
         # a.Apply(u.vec, rhs)
