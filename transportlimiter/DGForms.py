@@ -10,6 +10,7 @@ from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
 from netgen.csg import Pnt
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
+from ngsapps.utils import *
 
 def abs(x):
     return IfPos(x, x, -x)
@@ -17,12 +18,23 @@ def abs(x):
 def UpwindFormNonDivergence(fes, beta, v, w, h, n):
     aupw = BilinearForm(fes)
     
-    aupw += SymbolicBFI(-beta*grad(v)*w)
-    aupw += SymbolicBFI( IfPos(beta*n,beta*n,0)*v*w, BND, skeleton=True)
-    aupw += SymbolicBFI(beta*n* (v - v.Other())*0.5*(w + w.Other()), skeleton=True)
+    aupw += SymbolicBFI(beta*grad(v)*w)
+    aupw += SymbolicBFI(negPart(beta*n)*v*w, BND, skeleton=True)
+    aupw += SymbolicBFI(-beta*n*(v - v.Other())*0.5*(w + w.Other()), skeleton=True)
+    aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)    
+    
+    return aupw
+
+def UpwindFormDivergence(fes, beta, v, w, h, n):
+    aupw = BilinearForm(fes)
+    
+    aupw += SymbolicBFI(-v*beta*grad(w))
+    aupw += SymbolicBFI(posPart(beta*n)*v*w, BND, skeleton=True)
+    aupw += SymbolicBFI(beta*n*(v + v.Other())*0.5*(w - w.Other()), skeleton=True)
     aupw += SymbolicBFI(0.5*abs(beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
     
     return aupw
+
 
 def SIPForm(D, eta, fes, v, w, h, n, Dirichlet=True):
         # Diffusion
