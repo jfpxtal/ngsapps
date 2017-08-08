@@ -15,12 +15,13 @@ import numpy as np
 from ngsapps.utils import *
 from ngsapps.plotting import *
 from limiter import *
+from rungekutta import *
 
 ngsglobals.msg_level = 1
 
 order = 1
 maxh = 0.01
-tau = 0.001
+tau = 0.01
 tend = -1
 
 usegeo = "1d"
@@ -51,21 +52,12 @@ if usegeo == "circle":
     beta = CoefficientFunction((1,0))
 elif usegeo == "1d":
     beta = CoefficientFunction(0.1)
-    
+
 mu = 0.0
 
 # upwind fluxes scheme
 a = BilinearForm(fes)
 
-# # centered trial
-# a += SymbolicBFI((1-2*u)*beta*grad(v)*w)
-# a += SymbolicBFI(negPart((1-2*u)*beta*n)*v*w, BND, skeleton=True)
-# a += SymbolicBFI(-(1-2*u)*beta*n*(v - v.Other())*0.5*(w + w.Other()), skeleton=True)
-
-# # centered test
-# a += SymbolicBFI(-(1-2*u)*beta*v*grad(w))
-# a += SymbolicBFI(negPart((1-2*u)*beta*n)*v*w, BND, skeleton=True)
-# a += SymbolicBFI(-(1-2*u)*beta*n*(v - v.Other())*0.5*(w + w.Other()), skeleton=True)
 
 # u_t + beta*grad(u) = 0
 # a += SymbolicBFI((1-2*u)*beta*grad(v)*w)
@@ -80,6 +72,7 @@ a = BilinearForm(fes)
 # a += SymbolicBFI(0.5*10*abs((1-2*u)*beta*n)*(v - v.Other())*(w - w.Other()), skeleton=True)
 
 # Lax Friedrichs
+# explicit
 etaf = abs(beta*n)
 phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
 phi += 0.5*etaf*(v-v.Other(0))
@@ -87,6 +80,15 @@ phi += 0.5*etaf*(v-v.Other(0))
 a += SymbolicBFI(-v*(1-v)*beta*grad(w))
 a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
 a += SymbolicBFI(phi*w, BND, skeleton=True)
+
+# semi-implicit (not working yet, GridFunction.Other())
+# etaf = abs(beta*n)
+# phi = 0.5*(v*(1-u) + v.Other(0)*(1-u.Other(0)))*beta*n
+# phi += 0.5*etaf*(v-v.Other(0))
+
+# a += SymbolicBFI(-v*(1-u)*beta*grad(w))
+# a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
+# a += SymbolicBFI(phi*w, BND, skeleton=True)
 
 
 # mass matrix
@@ -115,6 +117,11 @@ if netgenMesh.dim == 1:
 else:
     Draw(u, mesh, 'u')
 
+def step(t, y):
+    a.Apply(y, rhs)
+    fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
+    return -rhs
+
 input("Press any key...")
 
 # Explicit Euler
@@ -129,32 +136,30 @@ with TaskManager():
         # a.Assemble()
 
         # Explicit
-        a.Apply(u.vec, rhs)
-        fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
-        u.vec.data -= tau*rhs
-        # rhs.data = (-1*tau)*rhs
-        # rhs.data += m.mat * u.vec
-        # rhs.data = m.mat * u.vec - tau * a.mat * u.vec
-        # rhs.data += f.vec
-        # u.vec.data = minv * rhs
+        # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
+        u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
+
+        # a.Apply(u.vec, rhs)
+        # fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
+        # u.vec.data -= tau*rhs
 
         # Implicits
-#        rhs.data = m.mat * u.vec
-#        mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
-#        invmat = mstar.Inverse(fes.FreeDofs())
-#        u.vec.data = invmat * rhs
+        # rhs.data = m.mat * u.vec
+        # mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
+        # invmat = mstar.Inverse(fes.FreeDofs())
+        # u.vec.data = invmat * rhs
 
-        # stabilityLimiter(u, fes, uplot)
-        # nonnegativityLimiter(u, fes, uplot)
+        stabilityLimiter(u, fes, uplot)
+        nonnegativityLimiter(u, fes, uplot)
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
 
         if netgenMesh.dim == 1:
-            if k % 10 == 0:
+            if k % 20 == 0:
                 uplot.Redraw()
                 plt.pause(0.001)
-                input()
+                # input()
         else:
             Redraw(blocking=False)
 
