@@ -20,9 +20,9 @@ from rungekutta import *
 
 ngsglobals.msg_level = 1
 
-order = 3
-maxh = 0.05
-tau = 0.001
+order = 1
+maxh = 0.1
+tau = 0.005
 tend = -1
 
 usegeo = "1d"
@@ -33,6 +33,21 @@ if usegeo == "circle":
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 elif usegeo == "1d":
     netgenMesh = Make1DMesh(-1, 1, maxh)
+elif usegeo == "test":
+    netgenMesh = NetMesh()
+    netgenMesh.dim = 1
+    start = -1
+    L = 2
+    N = 3 # Nof elements ? yep
+    pnums = []
+    for i in range(0, N + 1):
+        pnums.append(netgenMesh.Add(MeshPoint(Pnt(start + L * i / N, 0, 0))))
+
+    for i in range(0, N):
+        netgenMesh.Add(Element1D([pnums[i], pnums[i + 1]]))
+
+#    netgenMesh.Add(Element0D(pnums[0], index=1))
+#    netgenMesh.Add(Element0D(pnums[N], index=2))
 
 mesh = Mesh(netgenMesh)
 #mesh.Curve(order)
@@ -51,9 +66,9 @@ h = specialcf.mesh_size
 # velocity field and absorption
 if usegeo == "circle":
     beta = CoefficientFunction((1,0))
-elif usegeo == "1d":
+elif usegeo == "1d" or usegeo == "test":
     beta = CoefficientFunction(1)
-    
+
 mu = 0.0
 
 # upwind fluxes scheme
@@ -100,7 +115,11 @@ f += SymbolicLFI(0 * w)
 rhs = u.vec.CreateVector()
 # mstar = aupw.mat.CreateMatrix()
 
-u.Set(exp(-(x*x+y*y)))
+if usegeo == "test":
+    u.vec[2] = 1
+    u.vec[3] = 1
+else:
+    u.Set(exp(-(x*x+y*y)))
 
 if netgenMesh.dim == 1:
     uplot = Plot(u, mesh=mesh, subdivision=3)
@@ -120,7 +139,7 @@ with TaskManager():
     while tend < 0 or t < tend - tau / 2:
         print("\nt = {:10.6e}".format(t))
         t += tau
-        
+
         # Explicit
         # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
         u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
