@@ -87,8 +87,8 @@ def Make1DMesh(start, end, maxh):
         # netmesh.SetMaterial(i+1, 'top'+str(i+1))
         # netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
 
-    # netmesh.Add(Element0D(pnums[0], index=1))
-    # netmesh.Add(Element0D(pnums[N], index=2))
+    netmesh.Add(Element0D(pnums[0], index=1))
+    netmesh.Add(Element0D(pnums[N], index=2))
     netmesh.SetMaterial(1, 'top')
     return netmesh
 

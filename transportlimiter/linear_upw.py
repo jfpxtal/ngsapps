@@ -12,19 +12,19 @@ from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
 from netgen.csg import Pnt
 from netgen.geom2d import SplineGeometry
 from ngsolve import *
-from ngsapps.utils import *
 import numpy as np
 
+from ngsapps.utils import *
 from ngsapps.plotting import *
+from rungekutta import *
 
 ngsglobals.msg_level = 1
 
 order = 3
 maxh = 0.05
-tau = 0.01
+tau = 0.001
 tend = -1
 
-usegeo = "circle"
 usegeo = "1d"
 
 if usegeo == "circle":
@@ -89,44 +89,52 @@ m += SymbolicBFI(v*w)
 f = LinearForm(fes)
 f += SymbolicLFI(0 * w)
 
-print('Assembling aupw...')
-aupw.Assemble()
-print('Assembling m...')
-m.Assemble()
-minv = m.mat.Inverse(fes.FreeDofs())
-print('Assembling f...')
-f.Assemble()
+# print('Assembling aupw...')
+# aupw.Assemble()
+# print('Assembling m...')
+# m.Assemble()
+# minv = m.mat.Inverse(fes.FreeDofs())
+# print('Assembling f...')
+# f.Assemble()
 
 rhs = u.vec.CreateVector()
-mstar = aupw.mat.CreateMatrix()
+# mstar = aupw.mat.CreateMatrix()
 
 u.Set(exp(-(x*x+y*y)))
 
 if netgenMesh.dim == 1:
-    uplot = Plot(u, mesh=mesh)
+    uplot = Plot(u, mesh=mesh, subdivision=3)
     plt.show(block=False)
 else:
     Draw(u, mesh, 'u')
 
+def step(t, y):
+    aupw.Apply(y, rhs)
+    fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
+    return -rhs
+
 input("Press any key...")
 
-# Explicit Euler
 t = 0.0
 with TaskManager():
     while tend < 0 or t < tend - tau / 2:
         print("\nt = {:10.6e}".format(t))
         t += tau
-
-        # Explicit
-#        rhs.data = m.mat * u.vec - tau * aupw.mat * u.vec
-#        rhs.data += f.vec
-#        u.vec.data = minv * rhs
         
+        # Explicit
+        # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
+        u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
+
+
+        # rhs.data = m.mat * u.vec - tau * aupw.mat * u.vec
+        # rhs.data += f.vec
+        # u.vec.data = minv * rhs
+
         # Implicit
-        rhs.data = m.mat * u.vec
-        mstar.AsVector().data = m.mat.AsVector() + tau * aupw.mat.AsVector()
-        invmat = mstar.Inverse(fes.FreeDofs())
-        u.vec.data = invmat * rhs
+        # rhs.data = m.mat * u.vec
+        # mstar.AsVector().data = m.mat.AsVector() + tau * aupw.mat.AsVector()
+        # invmat = mstar.Inverse(fes.FreeDofs())
+        # u.vec.data = invmat * rhs
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
@@ -134,6 +142,7 @@ with TaskManager():
         if netgenMesh.dim == 1:
             uplot.Redraw()
             plt.pause(0.05)
-            input()
         else:
             Redraw(blocking=False)
+
+        # input()
