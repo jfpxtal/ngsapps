@@ -21,7 +21,7 @@ ngsglobals.msg_level = 1
 
 order = 3
 maxh = 0.01
-tau = 0.01
+tau = 0.001
 tend = -1
 
 usegeo = "1d"
@@ -73,46 +73,59 @@ a = BilinearForm(fes)
 
 # Lax Friedrichs
 # explicit
+# etaf = abs(beta*n)
+# phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
+# phi += 0.5*etaf*(v-v.Other(0))
+
+# phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
+
+# a += SymbolicBFI(-v*(1-v)*beta*grad(w))
+# a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
+# a += SymbolicBFI(phiR*w, BND, skeleton=True)
+
+# etaf = abs(beta*n)
+# phi = 0.5*v*(1-v)*beta*n
+# phi += 0.25*etaf*(v-v.Other(0))
+
+# phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
+
+# a += SymbolicBFI(-v*(1-v)*beta*grad(w))
+# a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
+# a += SymbolicBFI(phiR*w, BND, skeleton=True)
+
+# semi-implicit
 etaf = abs(beta*n)
-phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
-phi += 0.5*etaf*(v-v.Other(0))
+phi = 0.5*v*(1-u)*beta*n
+phi += 0.25*etaf*(v-v.Other(0))
 
 phiR = IfPos(beta*n, beta*n*IfPos(u-0.5, 0.25, u*(1-u)), 0)
 
-a += SymbolicBFI(-v*(1-v)*beta*grad(w))
-a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
-a += SymbolicBFI(phiR*w, BND, skeleton=True)
-
-# semi-implicit (not working yet, GridFunction.Other())
-# etaf = abs(beta*n)
-# phi = 0.5*(v*(1-u) + v.Other(0)*(1-u.Other(0)))*beta*n
-# phi += 0.5*etaf*(v-v.Other(0))
-
-# a += SymbolicBFI(-v*(1-u)*beta*grad(w))
-# a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
-# a += SymbolicBFI(phi*w, BND, skeleton=True) FIXME
+a += SymbolicBFI(-v*(1-u)*beta*grad(w))
+# use element_boundary to circumvent GridFunction.Other()
+a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
+# element_boundary also integrates over facets at domain boundary
+# but we need different terms on the domain boundary
+# so we first subtract the wrong contribution (a bit hacky)
+a += SymbolicBFI(-1*phi*w, BND, skeleton=True)
+# boundary term needs to be explicit, because it is nonlinear
+# fully explicit -> no longer depends on v -> LinearForm
+f = LinearForm(fes)
+f += SymbolicLFI(phiR*w, BND, skeleton=True)
 
 
 # mass matrix
 m = BilinearForm(fes)
 m += SymbolicBFI(v*w)
 
-f = LinearForm(fes)
-f += SymbolicLFI(0 * w)
-
-# print('Assembling a...')
-# a.Assemble()
 print('Assembling m...')
 m.Assemble()
 minv = m.mat.Inverse(fes.FreeDofs())
-# print('Assembling f...')
-# f.Assemble()
 
 rhs = u.vec.CreateVector()
-# mstar = m.mat.CreateMatrix()
+mstar = m.mat.CreateMatrix()
 
 u.Set(0.9*exp(-2*(x*x+y*y)))
-# u.Set(CoefficientFunction(0.4))
+# u.Set(CoefficientFunction(0.6))
 
 if netgenMesh.dim == 1:
     uplot = Plot(u, mesh=mesh, subdivision=3)
@@ -136,34 +149,36 @@ with TaskManager():
         t += tau
         k += 1
 
-        # a.Assemble()
-
         # Explicit
         # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
         # TODO: limit after each interior Euler step!
-        u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
+        # u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
 
         # a.Apply(u.vec, rhs)
         # fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
         # u.vec.data -= tau*rhs
 
-        # Implicits
-        # rhs.data = m.mat * u.vec
-        # mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
-        # invmat = mstar.Inverse(fes.FreeDofs())
-        # u.vec.data = invmat * rhs
+        # Semi-implicit
+        a.Assemble()
+        f.Assemble()
 
-        stabilityLimiter(u, fes, uplot)
-        nonnegativityLimiter(u, fes, uplot)
+        rhs.data = m.mat * u.vec - tau * f.vec
+        mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
+        invmat = mstar.Inverse(fes.FreeDofs())
+        u.vec.data = invmat * rhs
+
+        # stabilityLimiter(u, fes, uplot)
+        # nonnegativityLimiter(u, fes, uplot)
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
 
         if netgenMesh.dim == 1:
-            if k % 20 == 0:
+            if k % 100 == 0:
                 uplot.Redraw()
                 plt.pause(0.001)
-                # input()
+            # if t>1.2:
+            #     input()
         else:
             Redraw(blocking=False)
 
