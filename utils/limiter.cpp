@@ -29,8 +29,8 @@ double negPart(double x)
 
 void limit(shared_ptr<GridFunction> u, double theta, double M, double h)
 {
-  const auto &fes = u->GetFESpace();
-  const auto &ma = fes->GetMeshAccess();
+  const auto fes = u->GetFESpace();
+  const auto ma = fes->GetMeshAccess();
   // Flags flags;
   // flags.SetFlag("novisual");
   // auto res = CreateGridFunction(fes, "gfu", flags);
@@ -38,8 +38,16 @@ void limit(shared_ptr<GridFunction> u, double theta, double M, double h)
   // res->GetVector() = u->GetVector();
   auto cpvec = u->GetVector().CreateVector();
   cpvec = u->GetVector();
-  const auto &diffop = fes->GetEvaluator(VOL);
-  const auto &bli = fes->GetIntegrator(VOL);
+  const auto diffop = fes->GetEvaluator(VOL);
+  auto single_evaluator =  fes->GetEvaluator(VOL);
+  if (dynamic_pointer_cast<BlockDifferentialOperator>(single_evaluator))
+    single_evaluator = dynamic_pointer_cast<BlockDifferentialOperator>(single_evaluator)->BaseDiffOp();
+
+  auto trial = make_shared<ProxyFunction>(false, false, single_evaluator,
+                                          nullptr, nullptr, nullptr, nullptr, nullptr);
+  auto test  = make_shared<ProxyFunction>(true, false, single_evaluator,
+                                          nullptr, nullptr, nullptr, nullptr, nullptr);
+  auto bli = make_shared<SymbolicBilinearFormIntegrator> (InnerProduct(trial,test), VOL, false);
 
   LocalHeap glh(100000, "limiter lh");
   IterateElements(*fes, VOL, glh, [&] (FESpace::Element el, LocalHeap &lh)
