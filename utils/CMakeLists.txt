@@ -9,6 +9,7 @@ add_ngsolve_python_module(libngsapps_utils
   zlogzcf.hpp zlogzcf.cpp
   annulusspeedcf.hpp annulusspeedcf.cpp
   utils.hpp utils.cpp
+  limiter.hpp limiter.cpp
   )
 
 install(TARGETS libngsapps_utils DESTINATION .)

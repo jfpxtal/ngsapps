@@ -9,6 +9,7 @@
 #include "cachecf.hpp"
 #include "zlogzcf.hpp"
 #include "annulusspeedcf.hpp"
+#include "limiter.hpp"
 
 using namespace ngfem;
 
@@ -202,6 +203,8 @@ void ExportNgsAppsUtils(py::module &m)
                                })
 
     ;
+
+  m.def("Limit", &limit);
 }
 
 PYBIND11_PLUGIN(libngsapps_utils)
