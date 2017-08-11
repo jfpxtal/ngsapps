@@ -8,7 +8,7 @@ u_t + div(u(1-u)\beta) = 0
 
 @author: pietschm
 """
-from netgen.geom2d import SplineGeometry
+from netgen.geom2d import SplineGeometry, unit_square
 from ngsolve import *
 import numpy as np
 
@@ -19,15 +19,15 @@ from rungekutta import *
 
 ngsglobals.msg_level = 1
 
-order = 3
-maxh = 0.01
-tau = 0.001
-# order = 1
-# maxh = 0.02
-# tau = 0.0005
+# order = 3
+# maxh = 0.01
+# tau = 0.001
+order = 1
+maxh = 0.02
+tau = 0.0001
 tend = -1
 
-usegeo = "1d"
+usegeo = "square"
 
 if usegeo == "circle":
     geo = SplineGeometry()
@@ -35,6 +35,8 @@ if usegeo == "circle":
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 elif usegeo == "1d":
     netgenMesh = Make1DMesh(-1, 1, maxh)
+elif usegeo == "square":
+    netgenMesh = unit_square.GenerateMesh(maxh=maxh)
 
 mesh = Mesh(netgenMesh)
 #mesh.Curve(order)
@@ -52,10 +54,10 @@ n = specialcf.normal(mesh.dim)
 h = specialcf.mesh_size
 
 # velocity field and absorption
-if usegeo == "circle":
-    beta = CoefficientFunction((1,0))
-elif usegeo == "1d":
+if usegeo == "1d":
     beta = CoefficientFunction(0.1)
+else:
+    beta = CoefficientFunction((1,0))
 
 mu = 0.0
 
@@ -77,44 +79,44 @@ a = BilinearForm(fes)
 
 # Lax Friedrichs
 # explicit
-# etaf = abs(beta*n)
-# phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
-# phi += 0.5*etaf*(v-v.Other(0))
-
-# phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
-
-# a += SymbolicBFI(-v*(1-v)*beta*grad(w))
-# a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
-# a += SymbolicBFI(phiR*w, BND, skeleton=True)
-
-# etaf = abs(beta*n)
-# phi = 0.5*v*(1-v)*beta*n
-# phi += 0.25*etaf*(v-v.Other(0))
-
-# phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
-
-# a += SymbolicBFI(-v*(1-v)*beta*grad(w))
-# a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
-# a += SymbolicBFI(phiR*w, BND, skeleton=True)
-
-# semi-implicit
 etaf = abs(beta*n)
-phi = 0.5*v*(1-u)*beta*n
+phi = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
+phi += 0.5*etaf*(v-v.Other(0))
+
+phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
+
+a += SymbolicBFI(-v*(1-v)*beta*grad(w))
+a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
+a += SymbolicBFI(phiR*w, BND, skeleton=True)
+
+etaf = abs(beta*n)
+phi = 0.5*v*(1-v)*beta*n
 phi += 0.25*etaf*(v-v.Other(0))
 
-phiR = IfPos(beta*n, beta*n*IfPos(u-0.5, 0.25, u*(1-u)), 0)
+phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
 
-a += SymbolicBFI(-v*(1-u)*beta*grad(w))
-# use element_boundary to circumvent GridFunction.Other()
+a += SymbolicBFI(-v*(1-v)*beta*grad(w))
 a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
-# element_boundary also integrates over facets at domain boundary
-# but we need different terms on the domain boundary
-# so we first subtract the wrong contribution (a bit hacky)
-a += SymbolicBFI(-1*phi*w, BND, skeleton=True)
-# boundary term needs to be explicit, because it is nonlinear
-# fully explicit -> no longer depends on v -> LinearForm
-f = LinearForm(fes)
-f += SymbolicLFI(phiR*w, BND, skeleton=True)
+a += SymbolicBFI(phiR*w, BND, skeleton=True)
+
+# semi-implicit
+# etaf = abs(beta*n)
+# phi = 0.5*v*(1-u)*beta*n
+# phi += 0.25*etaf*(v-v.Other(0))
+
+# phiR = IfPos(beta*n, beta*n*IfPos(u-0.5, 0.25, u*(1-u)), 0)
+
+# a += SymbolicBFI(-v*(1-u)*beta*grad(w))
+# # use element_boundary to circumvent GridFunction.Other()
+# a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
+# # element_boundary also integrates over facets at domain boundary
+# # but we need different terms on the domain boundary
+# # so we first subtract the wrong contribution (a bit hacky)
+# a += SymbolicBFI(-1*phi*w, BND, skeleton=True)
+# # boundary term needs to be explicit, because it is nonlinear
+# # fully explicit -> no longer depends on v -> LinearForm
+# f = LinearForm(fes)
+# f += SymbolicLFI(phiR*w, BND, skeleton=True)
 
 # # Add diffusion
 # D = 0.05
@@ -146,7 +148,8 @@ rhs = u.vec.CreateVector()
 rhs2 = u.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-u.Set(0.9*exp(-2*(x*x+y*y)))
+# u.Set(0.9*exp(-2*(x*x+y*y)))
+u.Set(0.9*exp(-10*(sqr(x-0.5)+sqr(y-0.5))))
 uc.Set(0.5+0*x)
 # u.Set(CoefficientFunction(0.4))
 
@@ -180,23 +183,24 @@ with TaskManager():
         # Explicit
         # u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
         # TODO: limit after each interior Euler step!
-        # u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
+        u.vec.data = RungeKutta(rk4, tau, step, t, u.vec)
 
 #        asip.Apply(u.vec, rhs)
 #        fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
 #        u.vec.data -= tau*rhs
 
         # Semi-implicit
-        a.Assemble()
-        f.Assemble()
+        # a.Assemble()
+        # f.Assemble()
 
-        rhs.data = m.mat * u.vec - tau * f.vec
-        mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
-        invmat = mstar.Inverse(fes.FreeDofs())
-        u.vec.data = invmat * rhs
+        # rhs.data = m.mat * u.vec - tau * f.vec
+        # mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
+        # invmat = mstar.Inverse(fes.FreeDofs())
+        # u.vec.data = invmat * rhs
 
         # stabilityLimiter(u, fes, uplot)
         # nonnegativityLimiter(u, fes, uplot)
+        Limit(u, 1, 0.1, maxh)
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
@@ -209,5 +213,6 @@ with TaskManager():
             #     input()
         else:
             Redraw(blocking=False)
+        # input()
 
 
