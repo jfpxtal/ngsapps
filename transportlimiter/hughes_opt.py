@@ -33,7 +33,6 @@ def f(u):
 def fprime(u):
     return 1 + 0*u
 
-
 order = 1
 maxh = 0.08
 tau = 0.02
@@ -51,16 +50,6 @@ alpha = 1 # Regularization parameter
 cK = 1 # Parameter to control strength of attraction
 
 vels = np.zeros((Na,times.size)) # Position of agents
-
-# Convolution kernel
-# compact support:
-#K = 0*x
-#norm = sqrt((x-agents[0])*(x-agents[0])+(y)*(y))
-#norm = sqrt((x)*(x)+y*y)
-
-#K = IfPos(1-norm/width, 1-norm/width, 0)
-
-
 
 eta = 5 # Penalty parameter
 
@@ -144,7 +133,7 @@ def EikonalSolver():
         phi.vec.data -= invmat * q   
 
         errNewton = q.Norm()
-    print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
+    #print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
 
 # Forms for Hughes Model diff-transport eq
 #aupw = UpwindFormNonDivergence(fes, -(1-2*u)*grad(phi), v, w, h, n)
@@ -281,7 +270,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
         E = Integrate(x*u, mesh)
         V = Integrate(u*sqr(x-E), mesh)
         Vs.append(V)
-        gadj.Set(V*sqr(x-E))
+        gadj.Set((1/tend)*V*sqr(x-E))
 
         fadj.Assemble() # Assemble RHSs
         fadj2.Assemble()
@@ -304,7 +293,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             norm = sqrt(sqr(x-agents[0])+y*y)
             K = cK*posPart(1-norm/width)
             g.Set(K)
-            upd = Integrate(u*(1-u)*grad(g)*grad(lam1), mesh)
+            upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
             lam3[i] = lam3[i] + tau*upd
             vels[i,k] = -Na*tend/alpha*lam3[i]
 
@@ -365,7 +354,7 @@ else:
 
 # Gradient descent
 Nopt = 10
-otau = 1
+otau = 0.1
 #sad
 
 
@@ -428,7 +417,7 @@ for k in range(Nopt):
         J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
     
     print('Functional J = ' + str(J))
-    input("press key")
+#    input("press key")
     #print(agentsdata)
 
     
