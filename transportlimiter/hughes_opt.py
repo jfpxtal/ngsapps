@@ -36,7 +36,7 @@ def fprime(u):
 
 order = 1
 maxh = 0.08
-tau = 0.04
+tau = 0.02
 tend = 2 # 3.5
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
 vtkoutput = False
@@ -47,8 +47,8 @@ D = 0.05
 
 Na = 1 # Number of agents
 width = 1 # width of conv kernel
-alpha = 0.1 # Regularization parameter
-cK = 0.1 # Parameter to control strength of attraction
+alpha = 1 # Regularization parameter
+cK = 1 # Parameter to control strength of attraction
 
 vels = np.zeros((Na,times.size)) # Position of agents
 
@@ -149,6 +149,7 @@ def EikonalSolver():
 
 aupw = BilinearForm(fes)
 beta = grad(phi)-grad(g)
+#beta = -grad(g)
 etaf = abs(beta*n)
 flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
 flux += 0.5*etaf*(v-v.Other(0))
@@ -167,15 +168,6 @@ rhs = u.vec.CreateVector()
 rhs2 = u.vec.CreateVector()
 mstar = asip.mat.CreateMatrix()
 
-def step(t, y):
-    aupw.Apply (y, rhs)
-    # HERE: Replace y by u.vec above works better for some reason even though it should be the same for euler....
-#    rhs.data = (-1*tau)*rhs
-    asip.Apply(y, rhs2)
-    rhs.data += rhs2
-#    a.Apply(y, rhs)
-    fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
-    return -rhs
 
 mstar.AsVector().data = m.mat.AsVector() + tau * D * asip.mat.AsVector()
 invmat = mstar.Inverse(fes.FreeDofs())
@@ -229,9 +221,10 @@ def HughesSolver(vels):
             nonnegativityLimiter(u, fes, uplot)
 
         if netgenMesh.dim == 1:
-            if k % 100 == 0:
+            if k % 5 == 0:
                 uplot.Redraw()
                 phiplot.Redraw()
+                gplot.Redraw()
                 plt.pause(0.001)
         else:
             Redraw(blocking=False)
@@ -269,7 +262,6 @@ def AdjointSolver(rhodata, phidata, agentsdata):
     t = 0.0
     k = 0
     # Initial data
-    xshift = 2
     lam1.Set(0*x)
     Vs = [] # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
@@ -320,7 +312,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             #nonnegativityLimiter(u, fes, uplot) # Adjoints not nonnegative !
             
         if netgenMesh.dim == 1:
-            if k % 100 == 0:
+            if k % 10 == 0:
                 lam1plot.Redraw()
                 lam2plot.Redraw()
                 plt.pause(0.001)
@@ -349,7 +341,20 @@ if netgenMesh.dim == 1:
     lam2plot = Plot(lam2, mesh=mesh)
     plt.title('lam2')
     
+    plt.figure()
+    plt.subplot(211)
+    gplot = Plot(g, mesh=mesh)
+    plt.title('K')
+    
+    # Plot agents position
+    plt.subplot(212)
+    ax = plt.gca()
+
+    line_x, = ax.plot(times,times)
+    plt.title('Position agent')
+
     plt.show(block=False)
+
 else:
     Draw(phi, mesh, 'phi')
     Draw(u, mesh, 'u')
@@ -360,6 +365,9 @@ else:
 Nopt = 10
 otau = 1
 #sad
+
+
+
 #with TaskManager():
 for k in range(Nopt):
     
@@ -367,6 +375,12 @@ for k in range(Nopt):
     #        import cProfile
     #        cProfile.run('HughesSolver(vels)')
     [rhodata, phidata, agentsdata] = HughesSolver(vels)
+    
+    
+    # Update agents plot
+    line_x.set_ydata(agentsdata)
+    ax.relim()
+    ax.autoscale_view()
     
 #    from matplotlib.widgets import Slider
 #    fig_sol, (ax, ax_slider) = plt.subplots(2, 1, gridspec_kw={'height_ratios':[10, 1]})
@@ -407,7 +421,7 @@ for k in range(Nopt):
     for i in range(0,Na):
         J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
     
-    print('Functional J = ' + str(J) + ' Vs = ' + str(Vs))
+    print('Functional J = ' + str(J))
     input("press key")
     #print(agentsdata)
 
