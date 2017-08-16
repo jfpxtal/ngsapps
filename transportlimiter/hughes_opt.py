@@ -67,12 +67,14 @@ eta = 5 # Penalty parameter
 usegeo = "circle"
 usegeo = "1d"
 
+radius = 5
+
 if usegeo == "circle":
     geo = SplineGeometry()
-    geo.AddCircle ( (0.0, 0.0), r=5, bc="cyl")
+    geo.AddCircle ( (0.0, 0.0), r=radius, bc="cyl")
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 elif usegeo == "1d":
-    netgenMesh = Make1DMesh(-5, 5, maxh)
+    netgenMesh = Make1DMesh(-radius, radius, maxh)
 
 mesh = Mesh(netgenMesh)
 
@@ -221,7 +223,7 @@ def HughesSolver(vels):
             nonnegativityLimiter(u, fes, uplot)
 
         if netgenMesh.dim == 1:
-            if k % 5 == 0:
+            if k % 25 == 0:
                 uplot.Redraw()
                 phiplot.Redraw()
                 gplot.Redraw()
@@ -312,7 +314,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             #nonnegativityLimiter(u, fes, uplot) # Adjoints not nonnegative !
             
         if netgenMesh.dim == 1:
-            if k % 10 == 0:
+            if k % 100 == 0:
                 lam1plot.Redraw()
                 lam2plot.Redraw()
                 plt.pause(0.001)
@@ -411,6 +413,10 @@ for k in range(Nopt):
     # TODO: Projection auf [-minvel, maxvel]
      #   urhl
     vels = vels - otau*nvels
+    
+    # Project to interval [-radius/tend, radius/tend]
+    vels = np.minimum(vels,radius/tend)
+    vels = np.maximum(vels,-radius/tend)
     
 #    print(nvels)
     #print(vels)
