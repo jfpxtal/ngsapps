@@ -165,7 +165,7 @@ def HughesSolver(vels):
     # Initial data
     mi = 1# Integrate(unitial, mesh)
     u.Set(1/mi*unitial)
-    agents = np.array([0.0]) # Initial pos agents
+    agents = np.array([-1]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
     phidata = []
@@ -253,7 +253,6 @@ def AdjointSolver(rhodata, phidata, agentsdata):
     k = 0
     # Initial data
     lam1.Set(0*x)
-    lam2.Set(0*x)
     Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
     vels = np.zeros((Na,times.size)) # Local vels
@@ -284,8 +283,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
-        rhs.data = tau*rhs
-        rhs.data += tau*fadj2.vec
+        rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
         gradlam1.Set(grad(lam1))
