@@ -31,12 +31,12 @@ def f(u):
     return 1-u
 
 def fprime(u):
-    return 1 + 0*u
+    return -1 + 0*u
 
 order = 1
-maxh = 0.08
-tau = 0.02
-tend = 2 # 3.5
+maxh = 0.06
+tau = 0.01
+tend = 3 # 3.5
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
 vtkoutput = False
 
@@ -56,7 +56,7 @@ eta = 5 # Penalty parameter
 usegeo = "circle"
 usegeo = "1d"
 
-radius = 5
+radius = 8
 
 if usegeo == "circle":
     geo = SplineGeometry()
@@ -168,8 +168,8 @@ def HughesSolver(vels):
     t = 0.0
     k = 0
     # Initial data
-    xshift = 2
-    u.Set(0.8*exp(-(sqr(x-xshift)+y*y)))
+    mi = 1# Integrate(unitial, mesh)
+    u.Set(1/mi*unitial)
     agents = np.array([0.0]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
@@ -186,6 +186,7 @@ def HughesSolver(vels):
         norm = sqrt(sqr(x-agents[0])+y*y)
         K = cK*posPart(1-norm/width)
         g.Set(K)
+#        g.Set(0*x)
 
         # IMEX Time integration
         aupw.Apply(u.vec,rhs)
@@ -212,11 +213,12 @@ def HughesSolver(vels):
             nonnegativityLimiter(u, fes, uplot)
 
         if netgenMesh.dim == 1:
-            if k % 25 == 0:
+            if k % 50 == 0:
                 uplot.Redraw()
                 phiplot.Redraw()
                 gplot.Redraw()
                 plt.pause(0.001)
+                print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
         else:
             Redraw(blocking=False)
 
@@ -226,7 +228,7 @@ def HughesSolver(vels):
 
 
 # Assemble forms for adjoint eq
-aupwadj = UpwindFormNonDivergence(fes, -(f(u)*f(u) + u*2*f(u)*fprime(u))*(grad(phi)-grad(g)), v, w, h, n)
+aupwadj = UpwindFormNonDivergence(fes, -(f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-grad(g)), v, w, h, n)
 ## asip stays the same
 fadj = LinearForm(fes)
 fadj += SymbolicLFI(-2*fprime(u)*f(u)*lam2/(sqr(sqr(f(u))+del2))*w) # FIXME
@@ -254,7 +256,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
     k = 0
     # Initial data
     lam1.Set(0*x)
-    Vs = [] # Save standard deviations to evaluate functional later on
+    Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
     vels = np.zeros((Na,times.size)) # Local vels
     for t in np.nditer(times):
@@ -269,8 +271,8 @@ def AdjointSolver(rhodata, phidata, agentsdata):
 
         E = Integrate(x*u, mesh)
         V = Integrate(u*sqr(x-E), mesh)
-        Vs.append(V)
-        gadj.Set((1/tend)*V*sqr(x-E))
+        Vs[k] = V
+        gadj.Set((1/tend)*V*(sqr(x-E) - 2*x*E*(1-Integrate(u, mesh))))
 
         fadj.Assemble() # Assemble RHSs
         fadj2.Assemble()
@@ -294,7 +296,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             K = cK*posPart(1-norm/width)
             g.Set(K)
             upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
-            lam3[i] = lam3[i] + tau*upd
+            lam3[i] = lam3[i] - tau*upd
             vels[i,k] = -Na*tend/alpha*lam3[i]
 
 
@@ -311,7 +313,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             Redraw(blocking=False)
 
         k += 1
-    return [vels, Vs]
+    return [vels[:,::-1], Vs]
 
 if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
@@ -333,16 +335,22 @@ if netgenMesh.dim == 1:
     plt.title('lam2')
     
     plt.figure()
-    plt.subplot(211)
+    plt.subplot(311)
     gplot = Plot(g, mesh=mesh)
     plt.title('K')
     
     # Plot agents position
-    plt.subplot(212)
+    plt.subplot(313)
     ax = plt.gca()
-
     line_x, = ax.plot(times,times)
     plt.title('Position agent')
+    
+    # Plot variance
+    plt.subplot(312)
+    axv = plt.gca()
+    linev_x, = axv.plot(times,times)
+    plt.title('Variance')
+    
 
     plt.show(block=False)
 
@@ -355,70 +363,80 @@ else:
 # Gradient descent
 Nopt = 10
 otau = 0.1
+
 #sad
+xshift = 2
+unitial = 0.8*exp(-(sqr(x-xshift)+y*y))
 
 
+with TaskManager():
+    for k in range(Nopt):
+        
+        # Solve forward problem
+        #        import cProfile
+        #        cProfile.run('HughesSolver(vels)')
+        [rhodata, phidata, agentsdata] = HughesSolver(vels)
+        
+        
+    #    from matplotlib.widgets import Slider
+    #    fig_sol, (ax, ax_slider) = plt.subplots(2, 1, gridspec_kw={'height_ratios':[10, 1]})
+    #    
+    #    vplot = Plot(u, ax=ax, mesh=mesh)
+    #    slider = Slider(ax_slider, "Time", 0, tend)
+    #    
+    #    def update(t):
+    #        k = int(t/tau)
+    #        u.vec.FV()[:] = rhodata[k]
+    #        vplot.Redraw()
+    #        #plt.pause(0.000001)
+    #
+    #    slider.on_changed(update)
+    #    plt.show(block=False)
+        
+        # Solve backward problem (call with data already reversed in time)
+        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1])
+        
+        # print(Vs)
+        # Plot 
 
-#with TaskManager():
-for k in range(Nopt):
-    
-    # Solve forward problem
-    #        import cProfile
-    #        cProfile.run('HughesSolver(vels)')
-    [rhodata, phidata, agentsdata] = HughesSolver(vels)
-    
-    
-    # Update agents plot
-    line_x.set_ydata(agentsdata)
-    ax.relim()
-    ax.autoscale_view()
-    
-#    from matplotlib.widgets import Slider
-#    fig_sol, (ax, ax_slider) = plt.subplots(2, 1, gridspec_kw={'height_ratios':[10, 1]})
-#    
-#    vplot = Plot(u, ax=ax, mesh=mesh)
-#    slider = Slider(ax_slider, "Time", 0, tend)
-#    
-#    def update(t):
-#        k = int(t/tau)
-#        u.vec.FV()[:] = rhodata[k]
-#        vplot.Redraw()
-#        #plt.pause(0.000001)
-#
-#    slider.on_changed(update)
-#    plt.show(block=False)
-    
-    # Solve backward problem (call with data already reversed in time)
-    [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1])
-    
-    # Plot 
-    lam1plot.Redraw()
-    lam2plot.Redraw()
-    uplot.Redraw()
-    phiplot.Redraw()
-    plt.pause(0.001)    
-    
-    # Update velocities 
-    # TODO: Projection auf [-minvel, maxvel]
-     #   urhl
-    vels = vels - otau*nvels
-    
-    # Project to interval [-radius/tend, radius/tend]
-    vels = np.minimum(vels,radius/tend)
-    vels = np.maximum(vels,-radius/tend)
-    
-#    print(nvels)
-    #print(vels)
-      #  asd
-    
-    # Evaluate Functional
-    J = tau/tend*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
-    for i in range(0,Na):
-        J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
-    
-    print('Functional J = ' + str(J))
-#    input("press key")
-    #print(agentsdata)
+        # Update agents plot
+        line_x.set_ydata(agentsdata)
+        ax.relim()
+        ax.autoscale_view()
+        
+        linev_x.set_ydata(Vs)
+        axv.relim()
+        axv.autoscale_view()
+        
+       
+        lam1plot.Redraw()
+        lam2plot.Redraw()
+        uplot.Redraw()
+        phiplot.Redraw()
+        plt.pause(0.001)    
+        
+        # Update velocities 
+        # TODO: Projection auf [-minvel, maxvel]
+         #   urhl
+        vels = vels - otau*nvels
+        
+        # Project to interval [-radius/tend, radius/tend]
+        vels = np.minimum(vels,0.5*radius/tend)
+        vels = np.maximum(vels,-0.5*radius/tend)
+        
+    #    print(nvels)
+        #print(vels)
+          #  asd
+        
+        # Evaluate Functional
+        J = tau/tend*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
+        print('Functional J_1 = ' + str(J))
+        for i in range(0,Na):
+            J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
+        
+        print('Functional J = ' + str(J))
+    #    input("press key")
+        #print(agentsdata)
 
     
     
