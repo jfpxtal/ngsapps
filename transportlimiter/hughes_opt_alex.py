@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Created on Thu Jan  5 10:26:14 2017
 
-from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
-from netgen.csg import Pnt
-from netgen.geom2d import SplineGeometry
+@author: pietschm
+"""
 from ngsolve import *
 import numpy as np
 import time
@@ -20,11 +21,16 @@ import pickle
 
 ngsglobals.msg_level = 0
 
+def f(u):
+    return 1-u
+
+def fprime(u):
+    return -1 + 0*u
+
 order = 1
-maxh = 0.03
-# maxh = 0.1
-tau = 0.02
-tend = 3.5
+maxh = 0.06
+tau = 0.01
+tend = 3 # 3.5
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
 vtkoutput = False
 
@@ -34,32 +40,24 @@ D = 0.05
 
 Na = 1 # Number of agents
 width = 1 # width of conv kernel
-alpha = 0.1 # Regularization parameter
-cK = 0.1 # Parameter to control strength of attraction
+alpha = 1 # Regularization parameter
+cK = 1 # Parameter to control strength of attraction
 
 vels = np.zeros((Na,times.size)) # Position of agents
-
-# Convolution kernel
-# compact support:
-#K = 0*x
-#norm = sqrt((x-agents[0])*(x-agents[0])+(y)*(y))
-#norm = sqrt((x)*(x)+y*y)
-
-#K = IfPos(1-norm/width, 1-norm/width, 0)
-
-
 
 eta = 5 # Penalty parameter
 
 usegeo = "circle"
 usegeo = "1d"
 
+radius = 8
+
 if usegeo == "circle":
     geo = SplineGeometry()
-    geo.AddCircle ( (0.0, 0.0), r=5, bc="cyl")
+    geo.AddCircle ( (0.0, 0.0), r=radius, bc="cyl")
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 elif usegeo == "1d":
-    netgenMesh = Make1DMesh(-5, 5, maxh)
+    netgenMesh = Make1DMesh(-radius, radius, maxh)
 
 mesh = Mesh(netgenMesh)
 
@@ -91,191 +89,173 @@ m = BilinearForm(fes)
 m += SymbolicBFI(v*w)
 print('Assembling m...')
 m.Assemble()
-print('fin ass m')
 minv = m.mat.Inverse(fes.FreeDofs())
-print('inv m')
 
 # Eikonal equation forms
 a = SIPForm(del1, eta, fes, v, w, h, n, Dirichlet=True)
-aeupw = UpwindFormNonDivergence(fes, grad(phi_rhs), v, w, h, n, Compile=True)# Updwind for Hamilton Jacobi term
+aeupw = UpwindFormNonDivergence(fes, grad(phi_rhs), v, w, h, n, Compile=False)# Updwind for Hamilton Jacobi term
 feik = LinearForm(fes)
-feik += SymbolicLFI((1/(sqr(1-u)+del2)*w).Compile(True)) # FIXME
+feik += SymbolicLFI(1/(sqr(f(u))+del2)*w) # FIXME
 
-feik.Assemble() # shouldn't be necessary, but segfaults if removed
-print('a assem')
+feik.Assemble()
 a.Assemble()
-print('a assem fin')
 mstar = m.mat.CreateMatrix()
 a.Apply(phi.vec, q)
-print('a apply')
 
-# Solve reg. Eikonal equation using Newton's scheme
+# Solve reg. Eikonal equation usign Newton's scheme
 def EikonalSolver():
     tau = 1
     k = 0
     errNewton = 1e99
-    print('EIKSOLVER')
     while errNewton > 1e-6:
         k += 1
 
         # Apply nonlinear operator
         phi_rhs.vec.data = phi.vec
-        #aeupw.Assemble()
-        #a.Apply(phi.vec, q)
-        aeupw.Apply(phi.vec, q)
+        aeupw.Assemble()
+        q.data = aeupw.mat*phi.vec
         q.data += a.mat*phi.vec
         q.data -= feik.vec
 
         # Linearized HJ-Operator - has additional 2 from square
-        aeupw.Assemble()
         mstar.AsVector().data = a.mat.AsVector() + 2*aeupw.mat.AsVector()
 
-        # Solve for update and perform Newton step        
+        # Solve for update and perform Newton step
         invmat = mstar.Inverse(fes.FreeDofs())
-        phi.vec.data -= invmat * q   
+        phi.vec.data -= invmat * q
 
         errNewton = q.Norm()
-    print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
+    #print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
 
 # Forms for Hughes Model diff-transport eq
 #aupw = UpwindFormNonDivergence(fes, -(1-2*u)*grad(phi), v, w, h, n)
 
 aupw = BilinearForm(fes)
 beta = grad(phi)-grad(g)
+#beta = -grad(g)
 etaf = abs(beta*n)
-flux = 0.5*(v*(1-v) + v.Other(0)*(1-v.Other(0)))*beta*n
+flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
 flux += 0.5*etaf*(v-v.Other(0))
 
 #phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
 
-aupw += SymbolicBFI((-v*(1-v)*beta*grad(w)).Compile(True))
-aupw += SymbolicBFI((flux*(w - w.Other(0))).Compile(True), VOL, skeleton=True)
+aupw += SymbolicBFI(-v*f(v)*f(v)*beta*grad(w))
+aupw += SymbolicBFI(flux*(w - w.Other(0)), VOL, skeleton=True)
 #aupw += SymbolicBFI(phiR*w, BND, skeleton=True)
 
 #aupw = UpwindFormDivergence(fes, (1-u)*grad(phi), v, w, h, n)
 asip = SIPForm(1, eta, fes, v, w, h, n, Dirichlet=True)
-print('asip ass')
 asip.Assemble() # Does not change
-print(asip.mat)
-print('asip ass fin')
-
-
 
 rhs = u.vec.CreateVector()
-print('nach create rhs')
 rhs2 = u.vec.CreateVector()
-print('nach create rhs2')
-mstar = asip.mat.CreateMatrix() # segfault here
-print('nach create')
+mstar = asip.mat.CreateMatrix()
 
-def step(t, y):
-    aupw.Apply (y, rhs)
-    # HERE: Replace y by u.vec above works better for some reason even though it should be the same for euler....
-#    rhs.data = (-1*tau)*rhs
-    asip.Apply(y, rhs2)
-    rhs.data += rhs2
-#    a.Apply(y, rhs)
-    fes.SolveM(rho=CoefficientFunction(1), vec=rhs)
-    return -rhs
 
 mstar.AsVector().data = m.mat.AsVector() + tau * D * asip.mat.AsVector()
-print('nach mstar')
 invmat = mstar.Inverse(fes.FreeDofs())
-print('nach mstar inv')
 
 # Explicit Euler
 def HughesSolver(vels):
     t = 0.0
     k = 0
     # Initial data
-    xshift = 2
-    u.Set(0.8*exp(-(sqr(x-xshift)+y*y)))
-    agents = np.array([0.0]) # Initial pos agents
+    mi = 1# Integrate(unitial, mesh)
+    u.Set(1/mi*unitial)
+    agents = np.array([0]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
     phidata = []
     agentsdata = []
-    for t in np.nditer(times):
 
+    for t in np.nditer(times):
         # Solve Eikonal equation using Newton
-        print('assfeik')
         feik.Assemble()
-        print('eiksol')
         EikonalSolver()
-        print('eiksol !!!!!!!!! fini')
 
         # FIXME: Only one agent at the moment
         norm = sqrt(sqr(x-agents[0])+y*y)
         K = cK*posPart(1-norm/width)
         g.Set(K)
+#        g.Set(0*x)
 
         # IMEX Time integration
         aupw.Apply(u.vec,rhs)
         rhs.data = (1*tau)*rhs
         rhs.data += m.mat * u.vec #- tau * a.mat * u.vec
-        u.vec.data = invmat * rhs     
+        u.vec.data = invmat * rhs
 
         # Explicit
 #           u.vec.data = RungeKutta(euler, tau, step, t, u.vec)
 
         # Update Agents positions (expl. Euler)
-        agents = agents + tau*vels[:,k]
+        agents = agents + tau*vels[:,k] # FIXME
 
-        rhodata.append(u)
-        phidata.append(phi)
+        rhodata.append(u.vec.FV()[:])
+        phidata.append(phi.vec.FV()[:])
         agentsdata.append(agents)
 
         if vtkoutput and k % 10 == 0:
-            vtk.Do()                
+            vtk.Do()
 
-
-        # if netgenMesh.dim == 1:
-        #     stabilityLimiter(u, fes, uplot)
-#                nonnegativityLimiter(u, fes, uplot)
 
         if netgenMesh.dim == 1:
-            if k % 100 == 0:
+            stabilityLimiter(u, fes, uplot)
+            nonnegativityLimiter(u, fes, uplot)
+
+        if netgenMesh.dim == 1:
+            if k % 50 == 0:
                 uplot.Redraw()
                 phiplot.Redraw()
+                gplot.Redraw()
                 plt.pause(0.001)
+                print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
         else:
             Redraw(blocking=False)
 
         k += 1
+
     return [rhodata, phidata, agentsdata]
 
 
 # Assemble forms for adjoint eq
-aupwadj = UpwindFormNonDivergence(fes, (u*(1-u)+u*(1-2*u))*(grad(phi)+grad(g)), v, w, h, n, True)
-print('nach aupwadj')
+aupwadj = UpwindFormNonDivergence(fes, -(f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-grad(g)), v, w, h, n)
 ## asip stays the same
 fadj = LinearForm(fes)
-fadj += SymbolicLFI((2*u*(1-u)*(1-2*u)*lam2/sqr(sqr(1-u)+del2)*w).Compile(True)) # FIXME
+fadj += SymbolicLFI(-2*fprime(u)*f(u)*lam2/(sqr(sqr(f(u))+del2))*w) # FIXME
 fadj += SymbolicLFI(gadj*w)
-print('nach fadj')
 
-aupwadj2 = UpwindFormNonDivergence(fes, -2*grad(phi), v, w, h, n, True)
-print('nach aupwadj2')
+#aupwadj2 = UpwindFormNonDivergence(fes, -2*grad(phi), v, w, h, n)
+aupwadj2 = BilinearForm(fes)
+beta = 2*grad(phi)
+etaf = abs(beta*n)
+flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
+flux += 0.5*etaf*(v-v.Other(0))
+
+#phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
+
+aupwadj2 += SymbolicBFI(-v*f(v)*f(v)*beta*grad(w))
+aupwadj2 += SymbolicBFI(flux*(w - w.Other(0)), VOL, skeleton=True)
+
 fadj2 = LinearForm(fes)
-fadj2 += SymbolicLFI(-u*(1-u)*grad(lam1)*grad(w)) # FIXME
-print('nach aupwadj2 2')
-
+fadj2 += SymbolicLFI(-u*f(u)*f(u)*grad(lam1)*grad(w)) # FIXME
 
 invmat2 = del1*asip.mat.Inverse(fes.FreeDofs())
-print('nach invmat2')
 
-def AdjointSolver(rhodata, phidata, agentsdata):
+gradlam1 = GridFunction(fes)
+
+def AdjointSolver(rhodata, phidata, agentsdata, vels):
     t = 0.0
     k = 0
     # Initial data
-    xshift = 2
     lam1.Set(0*x)
-    Vs = [] # Save standard deviations to evaluate functional later on
+    Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
+    nvels = alpha/(Na*tend)*vels # Local vels
     for t in np.nditer(times):
         # Read data, backward in time (already reversed)
-        u.vec.data = rhodata[k].vec
-        phi.vec.data = phidata[k].vec
+        u.vec.FV()[:] = rhodata[k]
+        phi.vec.FV()[:] = phidata[k]
         agents = agentsdata[k]
 
         norm = sqrt(sqr(x-agents[0])+y*y)
@@ -284,8 +264,8 @@ def AdjointSolver(rhodata, phidata, agentsdata):
 
         E = Integrate(x*u, mesh)
         V = Integrate(u*sqr(x-E), mesh)
-        Vs.append(V)
-        gadj.Set(V*sqr(x-E))
+        Vs[k] = V
+        gadj.Set((1/tend)*V*(sqr(x-E) - 2*x*E*(1-Integrate(u, mesh))))
 
         fadj.Assemble() # Assemble RHSs
         fadj2.Assemble()
@@ -299,26 +279,26 @@ def AdjointSolver(rhodata, phidata, agentsdata):
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
-        rhs.data = tau*rhs
-        rhs.data += tau*fadj2.vec
+        rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
+        gradlam1.Set(grad(lam1))
         # Integrate lam3-equation
         for i in range(0,agents.size):
             norm = sqrt(sqr(x-agents[0])+y*y)
             K = cK*posPart(1-norm/width)
             g.Set(K)
-            upd = Integrate(u*(1-u)*grad(g)*grad(lam1), mesh)
+            upd = (1/Na)*Integrate((grad(u)*grad(lam1)*(sqr(f(u))+2*u*f(u)*fprime(u))+u*sqr(f(u))*grad(gradlam1))*grad(g), mesh)
             lam3[i] = lam3[i] + tau*upd
-            vels[i,k] = -Na*tend/alpha*lam3[i]
+            nvels[i,k] += lam3[i]
 
 
         if netgenMesh.dim == 1:
             stabilityLimiter(u, fes, uplot)
-            nonnegativityLimiter(u, fes, uplot)
+            #nonnegativityLimiter(u, fes, uplot) # Adjoints not nonnegative !
 
         if netgenMesh.dim == 1:
-            if k % 1== 0:
+            if k % 100 == 0:
                 lam1plot.Redraw()
                 lam2plot.Redraw()
                 plt.pause(0.001)
@@ -326,12 +306,12 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             Redraw(blocking=False)
 
         k += 1
-    return [vels, Vs]
+    return [nvels[:,::-1], Vs[::-1]]
 
 if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
     vtk.Do()
-    
+
 if netgenMesh.dim == 1:
     plt.subplot(221)
     uplot = Plot(u, mesh=mesh)
@@ -339,15 +319,33 @@ if netgenMesh.dim == 1:
     plt.subplot(222)
     phiplot = Plot(phi, mesh=mesh)
     plt.title('phi')
-    
+
     plt.subplot(223)
     lam1plot = Plot(lam1, mesh=mesh)
     plt.title('lam1')
     plt.subplot(224)
     lam2plot = Plot(lam2, mesh=mesh)
     plt.title('lam2')
-    
+
+    plt.figure()
+    plt.subplot(311)
+    gplot = Plot(g, mesh=mesh)
+    plt.title('K')
+
+    # Plot agents position
+    plt.subplot(313)
+    ax = plt.gca()
+    line_x, = ax.plot(times,times)
+    plt.title('Position agent')
+
+    # Plot variance
+    plt.subplot(312)
+    axv = plt.gca()
+    linev_x, = axv.plot(times,times)
+    plt.title('Variance')
+
     plt.show(block=False)
+
 else:
     Draw(phi, mesh, 'phi')
     Draw(u, mesh, 'u')
@@ -355,31 +353,82 @@ else:
     Draw(lam2, mesh, 'lam2')
 
 # Gradient descent
-Nopt = 10
-otau = 1
+Nopt = 20
+otau = 0.02
+
+#sad
+xshift = 2
+unitial = 0.8*exp(-(sqr(x-xshift)+y*y))
+
+
 with TaskManager():
     for k in range(Nopt):
 
         # Solve forward problem
+        #        import cProfile
+        #        cProfile.run('HughesSolver(vels)')
         [rhodata, phidata, agentsdata] = HughesSolver(vels)
 
-        # Solve backward problem (call with data already reversed in time)
-        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1])
+    #    from matplotlib.widgets import Slider
+    #    fig_sol, (ax, ax_slider) = plt.subplots(2, 1, gridspec_kw={'height_ratios':[10, 1]})
 
-        # Update velocities 
-        # TODO: Projection auf [-minvel, maxvel]
+    #    vplot = Plot(u, ax=ax, mesh=mesh)
+    #    slider = Slider(ax_slider, "Time", 0, tend)
+
+    #    def update(t):
+    #        k = int(t/tau)
+    #        u.vec.FV()[:] = rhodata[k]
+    #        vplot.Redraw()
+    #        #plt.pause(0.000001)
+    #
+    #    slider.on_changed(update)
+    #    plt.show(block=False)
+
+        # Solve backward problem (call with data already reversed in time)
+        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1], vels[:,::-1])
+
+        # print(Vs)
+        # Plot
+
+        # Update agents plot
+        line_x.set_ydata(agentsdata)
+        ax.relim()
+        ax.autoscale_view()
+
+        linev_x.set_ydata(Vs)
+        axv.relim()
+        axv.autoscale_view()
+
+
+        lam1plot.Redraw()
+        lam2plot.Redraw()
+        uplot.Redraw()
+        phiplot.Redraw()
+        plt.pause(0.001)
+
+        # Update velocities
         vels = vels - otau*nvels
+
+        # Project to interval [-radius/tend, radius/tend]
+        vels = np.minimum(vels,0.5*radius/tend)
+        vels = np.maximum(vels,-0.5*radius/tend)
+
+    #    print(nvels)
+        #print(vels)
+          #  asd
 
         # Evaluate Functional
         J = tau/tend*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
+        print('Functional J_1 = ' + str(J))
         for i in range(0,Na):
             J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
 
         print('Functional J = ' + str(J))
-        print(agentsdata)
+    #    input("press key")
+        #print(agentsdata)
 
-    
-    
+
+
 #feik.Assemble()
 #EikonalSolver()
 #[rhodata, phidata, agentsdata] = HughesSolver(vels)

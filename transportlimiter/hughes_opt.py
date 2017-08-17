@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jan  5 10:26:14 2017
-
 @author: pietschm
 """
 from netgen.meshing import Element0D, Element1D, MeshPoint, Mesh as NetMesh
@@ -23,6 +22,9 @@ from rungekutta import *
 import pickle
 
 ngsglobals.msg_level = 0
+
+def abs(x):
+    return IfPos(x, x, -x)
 
 def f(u):
     return 1-u
@@ -115,12 +117,14 @@ def EikonalSolver():
 
         # Apply nonlinear operator
         phi_rhs.vec.data = phi.vec
-        aeupw.Assemble()
-        q.data = aeupw.mat*phi.vec
+        #aeupw.Assemble()
+        #a.Apply(phi.vec, q)
+        aeupw.Apply(phi.vec, q)
         q.data += a.mat*phi.vec
         q.data -= feik.vec
 
         # Linearized HJ-Operator - has additional 2 from square
+        aeupw.Assemble()
         mstar.AsVector().data = a.mat.AsVector() + 2*aeupw.mat.AsVector()
 
         # Solve for update and perform Newton step        
@@ -165,7 +169,7 @@ def HughesSolver(vels):
     # Initial data
     mi = 1# Integrate(unitial, mesh)
     u.Set(1/mi*unitial)
-    agents = np.array([0]) # Initial pos agents
+    agents = np.array([0.0]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
     phidata = []
@@ -231,7 +235,7 @@ fadj += SymbolicLFI(gadj*w)
 
 #aupwadj2 = UpwindFormNonDivergence(fes, -2*grad(phi), v, w, h, n)
 aupwadj2 = BilinearForm(fes)
-beta = 2*grad(phi)
+beta = -2*grad(phi)
 etaf = abs(beta*n)
 flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
 flux += 0.5*etaf*(v-v.Other(0))
@@ -246,16 +250,14 @@ fadj2 += SymbolicLFI(-u*f(u)*f(u)*grad(lam1)*grad(w)) # FIXME
 
 invmat2 = del1*asip.mat.Inverse(fes.FreeDofs())
 
-gradlam1 = GridFunction(fes)
-
-def AdjointSolver(rhodata, phidata, agentsdata, vels):
+def AdjointSolver(rhodata, phidata, agentsdata):
     t = 0.0
     k = 0
     # Initial data
     lam1.Set(0*x)
     Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
-    nvels = alpha/(Na*tend)*vels # Local vels
+    vels = np.zeros((Na,times.size)) # Local vels
     for t in np.nditer(times):
         # Read data, backward in time (already reversed)
         u.vec.FV()[:] = rhodata[k]
@@ -283,18 +285,18 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
-        rhs.data += fadj2.vec
+        rhs.data = tau*rhs
+        rhs.data += tau*fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
-        gradlam1.Set(grad(lam1))
         # Integrate lam3-equation
         for i in range(0,agents.size):
             norm = sqrt(sqr(x-agents[0])+y*y)
             K = cK*posPart(1-norm/width)
             g.Set(K)
-            upd = (1/Na)*Integrate((grad(u)*grad(lam1)*(sqr(f(u))+2*u*f(u)*fprime(u))+u*sqr(f(u))*grad(gradlam1))*grad(g), mesh)
-            lam3[i] = lam3[i] + tau*upd
-            nvels[i,k] += lam3[i]
+            upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
+            lam3[i] = lam3[i] - tau*upd
+            vels[i,k] = -Na*tend/alpha*lam3[i]
 
 
         if netgenMesh.dim == 1:
@@ -310,7 +312,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
             Redraw(blocking=False)
 
         k += 1
-    return [nvels[:,::-1], Vs[::-1]]
+    return [vels[:,::-1], Vs]
 
 if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
@@ -358,8 +360,8 @@ else:
     Draw(lam2, mesh, 'lam2')
 
 # Gradient descent
-Nopt = 20
-otau = 0.02
+Nopt = 10
+otau = 0.1
 
 #sad
 xshift = 2
@@ -391,7 +393,7 @@ with TaskManager():
     #    plt.show(block=False)
         
         # Solve backward problem (call with data already reversed in time)
-        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1], vels[:,::-1])
+        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1])
         
         # print(Vs)
         # Plot 
@@ -413,6 +415,8 @@ with TaskManager():
         plt.pause(0.001)    
         
         # Update velocities 
+        # TODO: Projection auf [-minvel, maxvel]
+         #   urhl
         vels = vels - otau*nvels
         
         # Project to interval [-radius/tend, radius/tend]
