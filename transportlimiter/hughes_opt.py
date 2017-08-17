@@ -165,7 +165,7 @@ def HughesSolver(vels):
     # Initial data
     mi = 1# Integrate(unitial, mesh)
     u.Set(1/mi*unitial)
-    agents = np.array([-1]) # Initial pos agents
+    agents = np.array([0]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
     phidata = []
@@ -248,14 +248,14 @@ invmat2 = del1*asip.mat.Inverse(fes.FreeDofs())
 
 gradlam1 = GridFunction(fes)
 
-def AdjointSolver(rhodata, phidata, agentsdata):
+def AdjointSolver(rhodata, phidata, agentsdata, vels):
     t = 0.0
     k = 0
     # Initial data
     lam1.Set(0*x)
     Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
-    vels = np.zeros((Na,times.size)) # Local vels
+    nvels = alpha/(Na*tend)*vels # Local vels
     for t in np.nditer(times):
         # Read data, backward in time (already reversed)
         u.vec.FV()[:] = rhodata[k]
@@ -294,7 +294,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             g.Set(K)
             upd = (1/Na)*Integrate((grad(u)*grad(lam1)*(sqr(f(u))+2*u*f(u)*fprime(u))+u*sqr(f(u))*grad(gradlam1))*grad(g), mesh)
             lam3[i] = lam3[i] + tau*upd
-            vels[i,k] = -Na*tend/alpha*lam3[i]
+            nvels[i,k] += lam3[i]
 
 
         if netgenMesh.dim == 1:
@@ -310,7 +310,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             Redraw(blocking=False)
 
         k += 1
-    return [vels[:,::-1], Vs[::-1]]
+    return [nvels[:,::-1], Vs[::-1]]
 
 if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
@@ -359,7 +359,7 @@ else:
 
 # Gradient descent
 Nopt = 20
-otau = 0.01
+otau = 0.02
 
 #sad
 xshift = 2
@@ -391,7 +391,7 @@ with TaskManager():
     #    plt.show(block=False)
         
         # Solve backward problem (call with data already reversed in time)
-        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1])
+        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1], vels[:,::-1])
         
         # print(Vs)
         # Plot 
