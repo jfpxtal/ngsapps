@@ -165,7 +165,7 @@ def HughesSolver(vels):
     # Initial data
     mi = 1# Integrate(unitial, mesh)
     u.Set(1/mi*unitial)
-    agents = np.array([5]) # Initial pos agents
+    agents = np.array([0.0]) # Initial pos agents
     phi.Set(5-abs(x))
     rhodata = []
     phidata = []
@@ -231,7 +231,7 @@ fadj += SymbolicLFI(gadj*w)
 
 #aupwadj2 = UpwindFormNonDivergence(fes, -2*grad(phi), v, w, h, n)
 aupwadj2 = BilinearForm(fes)
-beta = -2*grad(phi)
+beta = 2*grad(phi)
 etaf = abs(beta*n)
 flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
 flux += 0.5*etaf*(v-v.Other(0))
@@ -253,6 +253,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
     k = 0
     # Initial data
     lam1.Set(0*x)
+    lam2.Set(0*x)
     Vs = np.zeros(times.size) # Save standard deviations to evaluate functional later on
     lam3 = np.zeros(Na)
     vels = np.zeros((Na,times.size)) # Local vels
@@ -294,7 +295,7 @@ def AdjointSolver(rhodata, phidata, agentsdata):
             K = cK*posPart(1-norm/width)
             g.Set(K)
             upd = (1/Na)*Integrate((grad(u)*grad(lam1)*(sqr(f(u))+2*u*f(u)*fprime(u))+u*sqr(f(u))*grad(gradlam1))*grad(g), mesh)
-            lam3[i] = lam3[i] - tau*upd
+            lam3[i] = lam3[i] + tau*upd
             vels[i,k] = -Na*tend/alpha*lam3[i]
 
 
@@ -360,7 +361,7 @@ else:
 
 # Gradient descent
 Nopt = 20
-otau = 0.1
+otau = 0.01
 
 #sad
 xshift = 2
