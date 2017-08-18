@@ -229,12 +229,12 @@ fadj += SymbolicLFI(gadj*w)
 aupwadj2 = BilinearForm(fes)
 beta = 2*grad(phi)
 etaf = abs(beta*n)
-flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
+flux = 0.5*(v*beta + v.Other(0)*beta.Other(0))*n
 flux += 0.5*etaf*(v-v.Other(0))
 
 #phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
 
-aupwadj2 += SymbolicBFI(-v*f(v)*f(v)*beta*grad(w))
+aupwadj2 += SymbolicBFI(-v*beta*grad(w))
 aupwadj2 += SymbolicBFI(flux*(w - w.Other(0)), VOL, skeleton=True)
 
 fadj2 = LinearForm(fes)
@@ -277,8 +277,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
-        rhs.data = tau*rhs
-        rhs.data += tau*fadj2.vec
+        rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
         # Integrate lam3-equation
@@ -287,7 +286,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
             K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
             g.Set(K)
             upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
-            lam3[i] = lam3[i] + tau*upd
+            lam3[i] = lam3[i] - tau*upd
             nvels[i,k] += lam3[i]
 
 
@@ -416,7 +415,7 @@ with TaskManager():
           #  asd
 
         # Evaluate Functional
-        J = tau/tend*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
+        J = tau/(2*tend)*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
         print('Functional J_1 = ' + str(J))
         for i in range(0,Na):
             J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
