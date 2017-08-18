@@ -46,9 +46,9 @@ maxh = 0.1
 tau = 0.05
 tend = -1
 
-
-usegeo = "1d"
 usegeo = "circle"
+usegeo = "1d"
+
 
 if usegeo == "circle":
     geo = SplineGeometry()
@@ -96,7 +96,7 @@ minv = m.mat.Inverse(fes.FreeDofs())
 
 del1 = 0.1
 del2 = 0.1
-eta = 3
+eta = 5
 a = BilinearForm(fes)
 a += SymbolicBFI(del1*grad(v)*grad(w))
 a += SymbolicBFI(-del1*0.5*(grad(v) + grad(v.Other())) * n * (w - w.Other()), skeleton=True) 
@@ -136,8 +136,10 @@ def EikonalSolver():
     k = 0
     errNewton = 1e99
     with TaskManager():
-        while errNewton > 1e-6:
+        while errNewton > 1e-6 or k < 200:
             k += 1
+            
+            del1 = 1/(k*k*k*k)
             
             # Apply nonlinear operator
             phi_rhs.vec.data = phi.vec
@@ -150,6 +152,7 @@ def EikonalSolver():
             tmp.vec.data = q2
             
             # Linearized HJ-Operator - has additional 2 from square
+            a.Assemble()
             aeupw.Assemble()
             mstar.AsVector().data = a.mat.AsVector() + 2*aeupw.mat.AsVector()
             
@@ -160,14 +163,14 @@ def EikonalSolver():
             
             errNewton = q.Norm()
             
-            print('Res error = ' + str(q.Norm()) + '\n') # L2norm of update
+            print('k = ' + str(k) + 'Res error = ' + str(q.Norm()) + 'diff = ' + str(1.0/1/(k*k*k*k)) + '\n') # L2norm of update
     
-#            if netgenMesh.dim == 1:
-#                if k % 1 == 0:
-#                    phiplot.Redraw()
-#                    plt.pause(0.001)
-#            else:
-#                Redraw(blocking=False)
+            if netgenMesh.dim == 1:
+                if k % 1 == 0:
+                    phiplot.Redraw()
+                    plt.pause(0.001)
+            else:
+                Redraw(blocking=False)
         
 #            input("")
 
