@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jan  5 10:26:14 2017
-
 @author: pietschm
 """
+from netgen.geom2d import SplineGeometry
 from ngsolve import *
 import numpy as np
 import time
@@ -28,7 +28,7 @@ def fprime(u):
     return -1 + 0*u
 
 order = 1
-maxh = 0.06
+maxh = 0.1
 tau = 0.01
 tend = 3 # 3.5
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
@@ -42,7 +42,7 @@ Na = 1 # Number of agents
 width = 1 # width of conv kernel
 alpha = 1 # Regularization parameter
 cK = 1 # Parameter to control strength of attraction
-
+sigK = 2 # Sigma of exponential conv kernel
 vels = np.zeros((Na,times.size)) # Position of agents
 
 eta = 5 # Penalty parameter
@@ -175,7 +175,7 @@ def HughesSolver(vels):
 
         # FIXME: Only one agent at the moment
         norm = sqrt(sqr(x-agents[0])+y*y)
-        K = cK*posPart(1-norm/width)
+        K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
         g.Set(K)
 #        g.Set(0*x)
 
@@ -229,20 +229,18 @@ fadj += SymbolicLFI(gadj*w)
 aupwadj2 = BilinearForm(fes)
 beta = 2*grad(phi)
 etaf = abs(beta*n)
-flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
+flux = 0.5*(v*beta + v.Other()*beta.Other())*n
 flux += 0.5*etaf*(v-v.Other(0))
 
 #phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
 
-aupwadj2 += SymbolicBFI(-v*f(v)*f(v)*beta*grad(w))
+aupwadj2 += SymbolicBFI(-v*beta*grad(w))
 aupwadj2 += SymbolicBFI(flux*(w - w.Other(0)), VOL, skeleton=True)
 
 fadj2 = LinearForm(fes)
 fadj2 += SymbolicLFI(-u*f(u)*f(u)*grad(lam1)*grad(w)) # FIXME
 
 invmat2 = del1*asip.mat.Inverse(fes.FreeDofs())
-
-gradlam1 = GridFunction(fes)
 
 def AdjointSolver(rhodata, phidata, agentsdata, vels):
     t = 0.0
@@ -259,7 +257,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         agents = agentsdata[k]
 
         norm = sqrt(sqr(x-agents[0])+y*y)
-        K = cK*posPart(1-norm/width)
+        K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
         g.Set(K)
 
         E = Integrate(x*u, mesh)
@@ -282,14 +280,13 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
-        gradlam1.Set(grad(lam1))
         # Integrate lam3-equation
         for i in range(0,agents.size):
             norm = sqrt(sqr(x-agents[0])+y*y)
-            K = cK*posPart(1-norm/width)
+            K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
             g.Set(K)
-            upd = (1/Na)*Integrate((grad(u)*grad(lam1)*(sqr(f(u))+2*u*f(u)*fprime(u))+u*sqr(f(u))*grad(gradlam1))*grad(g), mesh)
-            lam3[i] = lam3[i] + tau*upd
+            upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
+            lam3[i] = lam3[i] - tau*upd
             nvels[i,k] += lam3[i]
 
 
@@ -319,7 +316,7 @@ if netgenMesh.dim == 1:
     plt.subplot(222)
     phiplot = Plot(phi, mesh=mesh)
     plt.title('phi')
-
+ 
     plt.subplot(223)
     lam1plot = Plot(lam1, mesh=mesh)
     plt.title('lam1')
@@ -354,7 +351,7 @@ else:
 
 # Gradient descent
 Nopt = 20
-otau = 0.02
+otau = 0.05
 
 #sad
 xshift = 2
@@ -426,8 +423,6 @@ with TaskManager():
         print('Functional J = ' + str(J))
     #    input("press key")
         #print(agentsdata)
-
-
 
 #feik.Assemble()
 #EikonalSolver()
