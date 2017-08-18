@@ -415,7 +415,7 @@ with TaskManager():
           #  asd
 
         # Evaluate Functional
-        J = tau/tend*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
+        J = tau/(2*tend)*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
         print('Functional J_1 = ' + str(J))
         for i in range(0,Na):
             J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
