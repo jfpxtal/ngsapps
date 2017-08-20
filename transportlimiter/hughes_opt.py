@@ -63,6 +63,7 @@ mesh = Mesh(netgenMesh)
 
 # finite element space
 fes = L2(mesh, order=order, flags={'dgjumps': True})
+p1fes = L2(mesh, order=1, flags={'dgjumps': True})
 v = fes.TrialFunction()
 w = fes.TestFunction()
 
@@ -131,7 +132,7 @@ def EikonalSolver():
 #aupw = UpwindFormNonDivergence(fes, -(1-2*u)*grad(phi), v, w, h, n)
 
 aupw = BilinearForm(fes)
-beta = grad(phi)-grad(g)
+beta = grad(phi)-g
 #beta = -grad(g)
 etaf = abs(beta*n)
 flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
@@ -176,7 +177,7 @@ def HughesSolver(vels):
         # FIXME: Only one agent at the moment
         norm = sqrt(sqr(x-agents[0])+y*y)
         K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
-        g.Set(K)
+        g.Set(-2*(x-agents[0])*sigK*K)
 #        g.Set(0*x)
 
         # IMEX Time integration
@@ -200,8 +201,8 @@ def HughesSolver(vels):
 
 
         if netgenMesh.dim == 1:
-            stabilityLimiter(u, fes, uplot)
-            nonnegativityLimiter(u, fes, uplot)
+            stabilityLimiter(u, p1fes)
+            nonnegativityLimiter(u, p1fes)
 
         if netgenMesh.dim == 1:
             if k % 50 == 0:
@@ -219,7 +220,7 @@ def HughesSolver(vels):
 
 
 # Assemble forms for adjoint eq
-aupwadj = UpwindFormNonDivergence(fes, -(f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-grad(g)), v, w, h, n)
+aupwadj = UpwindFormNonDivergence(fes, (f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-g), v, w, h, n)
 ## asip stays the same
 fadj = LinearForm(fes)
 fadj += SymbolicLFI(-2*fprime(u)*f(u)*lam2/(sqr(sqr(f(u))+del2))*w) # FIXME
@@ -229,7 +230,7 @@ fadj += SymbolicLFI(gadj*w)
 aupwadj2 = BilinearForm(fes)
 beta = 2*grad(phi)
 etaf = abs(beta*n)
-flux = 0.5*(v*beta + v.Other(0)*beta.Other(0))*n
+flux = 0.5*(v*beta + v.Other(0)*beta.Other())*n
 flux += 0.5*etaf*(v-v.Other(0))
 
 #phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
@@ -258,41 +259,43 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
         norm = sqrt(sqr(x-agents[0])+y*y)
         K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
-        g.Set(K)
+        g.Set(-2*(x-agents[0])*sigK*K)
 
-        E = Integrate(x*u, mesh)
-        V = Integrate(u*sqr(x-E), mesh)
+        mass = Integrate(u, mesh)
+        E = Integrate(x*u/mass, mesh)
+        V = Integrate(u/mass*sqr(x-E), mesh)
         Vs[k] = V
-        gadj.Set((1/tend)*V*(sqr(x-E) - 2*x*E*(1-Integrate(u, mesh))))
+        gadj.Set((1/tend)*V*sqr(x-E)/mass)
 
         fadj.Assemble() # Assemble RHSs
         fadj2.Assemble()
 
         # IMEX for lam1-Eq
         aupwadj.Apply(lam1.vec,rhs)
-        rhs.data = tau*rhs
+        rhs.data = -tau*rhs
         rhs.data += tau*fadj.vec
         rhs.data += m.mat * lam1.vec
         lam1.vec.data = invmat * rhs
+
+        if netgenMesh.dim == 1:
+            stabilityLimiter(lam1, p1fes)
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
         rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
+        if netgenMesh.dim == 1:
+            stabilityLimiter(lam2, p1fes)
+
         # Integrate lam3-equation
         for i in range(0,agents.size):
             norm = sqrt(sqr(x-agents[0])+y*y)
             K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
-            g.Set(K)
-            upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
+            g.Set(-2*sigK*K*(1-2*sigK*sqr(x-agents[0])))
+            upd = (1/Na)*Integrate(u*sqr(f(u))*g*grad(lam1), mesh)
             lam3[i] = lam3[i] - tau*upd
             nvels[i,k] += lam3[i]
-
-
-        if netgenMesh.dim == 1:
-            stabilityLimiter(u, fes, uplot)
-            #nonnegativityLimiter(u, fes, uplot) # Adjoints not nonnegative !
 
         if netgenMesh.dim == 1:
             if k % 100 == 0:
