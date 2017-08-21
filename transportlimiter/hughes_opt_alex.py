@@ -51,7 +51,7 @@ eta = 5 # Penalty parameter
 
 
 usegeo = "circle"
-# usegeo = "1d"
+usegeo = "1d"
 
 if usegeo == "circle":
     radius = 4
@@ -65,6 +65,7 @@ if usegeo == "circle":
     ag_init = [(1,1),(-1,-1)]
 
 elif usegeo == "1d":
+    radius = 8
     maxh = 0.1
     netgenMesh = Make1DMesh(-radius, radius, maxh)
 
