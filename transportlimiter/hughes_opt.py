@@ -40,15 +40,17 @@ D = 0.05
 
 Na = 1 # Number of agents
 width = 1 # width of conv kernel
-alpha = 1 # Regularization parameter
+alpha = 0.01 # Regularization parameter
 cK = 1 # Parameter to control strength of attraction
 sigK = 2 # Sigma of exponential conv kernel
-vels = np.zeros((Na,times.size)) # Position of agents
+vels = 0.8*np.ones((Na,times.size)) # Position of agents
 
 eta = 5 # Penalty parameter
 
 usegeo = "circle"
 usegeo = "1d"
+
+plotting = False
 
 radius = 8
 
@@ -132,7 +134,7 @@ def EikonalSolver():
 #aupw = UpwindFormNonDivergence(fes, -(1-2*u)*grad(phi), v, w, h, n)
 
 aupw = BilinearForm(fes)
-beta = grad(phi)-g
+beta = grad(phi)-grad(g)
 #beta = -grad(g)
 etaf = abs(beta*n)
 flux = 0.5*(v*f(v)*f(v) + v.Other(0)*f(v.Other(0))*f(v.Other(0)))*beta*n
@@ -177,7 +179,8 @@ def HughesSolver(vels):
         # FIXME: Only one agent at the moment
         norm = sqrt(sqr(x-agents[0])+y*y)
         K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
-        g.Set(-2*(x-agents[0])*sigK*K)
+        #g.Set(-2*(x-agents[0])*sigK*K)
+        g.Set(K)
 #        g.Set(0*x)
 
         # IMEX Time integration
@@ -205,12 +208,12 @@ def HughesSolver(vels):
             nonnegativityLimiter(u, p1fes)
 
         if netgenMesh.dim == 1:
-            if k % 50 == 0:
+            if k % 50 == 0 and plotting:
                 uplot.Redraw()
                 phiplot.Redraw()
                 gplot.Redraw()
                 plt.pause(0.001)
-                print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
+                #print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)))
         else:
             Redraw(blocking=False)
 
@@ -292,13 +295,14 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         for i in range(0,agents.size):
             norm = sqrt(sqr(x-agents[0])+y*y)
             K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
-            g.Set(-2*sigK*K*(1-2*sigK*sqr(x-agents[0])))
-            upd = (1/Na)*Integrate(u*sqr(f(u))*g*grad(lam1), mesh)
+#            g.Set(-2*sigK*K*(1-2*sigK*sqr(x-agents[0]))) # 2nd derivate
+            g.Set(-2*(x-agents[0])*sigK*K) # 1st derivative
+            upd = (1/Na)*Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
             lam3[i] = lam3[i] - tau*upd
             nvels[i,k] += lam3[i]
 
         if netgenMesh.dim == 1:
-            if k % 100 == 0:
+            if k % 100 == 0 and plotting:
                 lam1plot.Redraw()
                 lam2plot.Redraw()
                 plt.pause(0.001)
@@ -312,9 +316,10 @@ if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
     vtk.Do()
 
-if netgenMesh.dim == 1:
+if netgenMesh.dim == 1 and plotting:
     plt.subplot(221)
     uplot = Plot(u, mesh=mesh)
+    line_x, = plt.plot([0], [1], marker='o', markersize=3, color="red")
     plt.title('u')
     plt.subplot(222)
     phiplot = Plot(phi, mesh=mesh)
@@ -346,7 +351,7 @@ if netgenMesh.dim == 1:
 
     plt.show(block=False)
 
-else:
+elif plotting:
     Draw(phi, mesh, 'phi')
     Draw(u, mesh, 'u')
     Draw(lam1, mesh, 'lam1')
@@ -354,7 +359,7 @@ else:
 
 # Gradient descent
 Nopt = 20
-otau = 0.1
+otau = 0.4
 
 #sad
 xshift = 2
@@ -362,7 +367,9 @@ unitial = 0.8*exp(-(sqr(x-xshift)+y*y))
 
 
 with TaskManager():
-    for k in range(Nopt):
+#    for k in range(Nopt):
+    graderr = 1e10
+    while graderr > 1e-4:
 
         # Solve forward problem
         #        import cProfile
@@ -391,27 +398,29 @@ with TaskManager():
         # Plot
 
         # Update agents plot
-        line_x.set_ydata(agentsdata)
-        ax.relim()
-        ax.autoscale_view()
+        if plotting:
+            line_x.set_ydata(agentsdata)
+            ax.relim()
+            ax.autoscale_view()
 
-        linev_x.set_ydata(Vs)
-        axv.relim()
-        axv.autoscale_view()
-
-
-        lam1plot.Redraw()
-        lam2plot.Redraw()
-        uplot.Redraw()
-        phiplot.Redraw()
-        plt.pause(0.001)
+            linev_x.set_ydata(Vs)
+            axv.relim()
+            axv.autoscale_view()
+            
+            lam1plot.Redraw()
+            lam2plot.Redraw()
+            uplot.Redraw()
+            phiplot.Redraw()
+            plt.pause(0.001)
 
         # Update velocities
         vels = vels - otau*nvels
 
+        graderr = sqrt(tau*sum(np.multiply(nvels[0,:],nvels[0,:])))
+
         # Project to interval [-radius/tend, radius/tend]
-        vels = np.minimum(vels,0.5*radius/tend)
-        vels = np.maximum(vels,-0.5*radius/tend)
+        #vels = np.minimum(vels,0.5*radius/tend)
+        #vels = np.maximum(vels,-0.5*radius/tend)
 
     #    print(nvels)
         #print(vels)
@@ -419,11 +428,11 @@ with TaskManager():
 
         # Evaluate Functional
         J = tau/(2*tend)*sum(np.multiply(Vs,Vs))  # 1/T int_0^T |Vs|^2
-        print('Functional J_1 = ' + str(J))
+        #print('Functional J_1 = ' + str(J))
         for i in range(0,Na):
             J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
 
-        print('Functional J = ' + str(J))
+        print('Functional J = ' + str(J) + ' Gradient = ' + str(graderr) + '\n')
     #    input("press key")
         #print(agentsdata)
 
@@ -431,9 +440,10 @@ with TaskManager():
 #EikonalSolver()
 #[rhodata, phidata, agentsdata] = HughesSolver(vels)
 ##
-#pickler = NgsPickler(open ("rhodata.dat", "wb"))
-#pickler.dump (rhodata)
-#del pickler
+pickler = NgsPickler(open ("veldata.dat", "wb"))
+pickler.dump (vels)
+del pickler
+
 #pickler = NgsPickler(open ("phidata.dat", "wb"))
 #pickler.dump (phidata)
 #del pickler
