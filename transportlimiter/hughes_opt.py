@@ -50,7 +50,7 @@ eta = 5 # Penalty parameter
 usegeo = "circle"
 usegeo = "1d"
 
-plotting = False
+plotting = True
 
 radius = 8
 
@@ -104,6 +104,8 @@ feik.Assemble()
 a.Assemble()
 mstar = m.mat.CreateMatrix()
 a.Apply(phi.vec, q)
+
+rhofinal = np.zeros([times.size, u.vec.size])
 
 # Solve reg. Eikonal equation usign Newton's scheme
 def EikonalSolver():
@@ -165,9 +167,9 @@ def HughesSolver(vels):
     # Initial data
     mi = 1# Integrate(unitial, mesh)
     u.Set(1/mi*unitial)
-    agents = np.array([0]) # Initial pos agents
+    agents = np.array([1.0]) # Initial pos agents
     phi.Set(5-abs(x))
-    rhodata = []
+    rhodata = np.zeros([times.size, u.vec.size])
     phidata = []
     agentsdata = []
 
@@ -195,7 +197,8 @@ def HughesSolver(vels):
         # Update Agents positions (expl. Euler)
         agents = agents + tau*vels[:,k] # FIXME
 
-        rhodata.append(u.vec.FV()[:])
+        #rhodata.append(u.vec.FV()[:])
+        rhodata[k,:]= u.vec.FV().NumPy()[:]
         phidata.append(phi.vec.FV()[:])
         agentsdata.append(agents)
 
@@ -256,7 +259,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
     nvels = alpha/(Na*tend)*vels # Local vels
     for t in np.nditer(times):
         # Read data, backward in time (already reversed)
-        u.vec.FV()[:] = rhodata[k]
+        u.vec.FV().NumPy()[:] = rhodata[k]
         phi.vec.FV()[:] = phidata[k]
         agents = agentsdata[k]
 
@@ -359,17 +362,19 @@ elif plotting:
 
 # Gradient descent
 Nopt = 20
-otau = 0.4
+otau = 0.6
 
 #sad
 xshift = 2
 unitial = 0.8*exp(-(sqr(x-xshift)+y*y))
 
-
+Vopt = []
+Jopt = []
 with TaskManager():
 #    for k in range(Nopt):
     graderr = 1e10
-    while graderr > 1e-4:
+
+    while graderr > 0.25:
 
         # Solve forward problem
         #        import cProfile
@@ -392,7 +397,9 @@ with TaskManager():
     #    plt.show(block=False)
 
         # Solve backward problem (call with data already reversed in time)
-        [nvels,Vs] = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1], vels[:,::-1])
+        [nvels,Vs] = AdjointSolver(rhodata[::-1,:], phidata[::-1], agentsdata[::-1], vels[:,::-1])
+
+        Vopt.append(Vs)
 
         # print(Vs)
         # Plot
@@ -406,7 +413,6 @@ with TaskManager():
             linev_x.set_ydata(Vs)
             axv.relim()
             axv.autoscale_view()
-            
             lam1plot.Redraw()
             lam2plot.Redraw()
             uplot.Redraw()
@@ -432,6 +438,8 @@ with TaskManager():
         for i in range(0,Na):
             J += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[i,:],vels[i,:]))
 
+        Jopt.append(J)
+
         print('Functional J = ' + str(J) + ' Gradient = ' + str(graderr) + '\n')
     #    input("press key")
         #print(agentsdata)
@@ -440,19 +448,38 @@ with TaskManager():
 #EikonalSolver()
 #[rhodata, phidata, agentsdata] = HughesSolver(vels)
 ##
-pickler = NgsPickler(open ("veldata.dat", "wb"))
+pickler = pickle.Pickler(open ("veldata.dat", "wb"))
 pickler.dump (vels)
 del pickler
 
-#pickler = NgsPickler(open ("phidata.dat", "wb"))
-#pickler.dump (phidata)
-#del pickler
+pickler = pickle.Pickler(open ("variancedata.dat", "wb"))
+pickler.dump (Vopt)
+del pickler
+
+pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
+pickler.dump (agentsdata)
+del pickler
+
+pickler = pickle.Pickler(open ("rhodata.dat", "wb"))
+pickler.dump (rhodata)
+del pickler
+
+pickler = pickle.Pickler(open ("Jdata.dat", "wb"))
+pickler.dump (Jopt)
+del pickler
+
+
+#unpickler = pickle.Unpickler(open ("rhodata.dat", "rb"))
+#urh = unpickler.load()
+#del unpickler
+
+
 #pickler = NgsPickler(open ("agentsdata.dat", "wb"))
 #pickler.dump (agentsdata)
 #del pickler
 
 #
-#input("Press any key...")
+
 #unpickler = NgsUnpickler(open ("rhodata.dat", "rb"))
 #rhodata = unpickler.load()
 #del unpickler
