@@ -132,19 +132,19 @@ del unpickler
 
 ax = plt.gca()
 #plt.axes([0, 1, 0, 1])
-vplot = Plot(u, ax=ax, mesh=mesh,linewidth=4,label='contr')
+#vplot = Plot(u, ax=ax, mesh=mesh,linewidth=4,label='contr')
 uplot = Plot(uu, ax=ax, mesh=mesh,linewidth=4,label='uncontr')
-linea, = ax.plot(agentsdata[0], [0.4], marker='o', markersize=15, color="red")
-plt.legend()
+#linea, = ax.plot(agentsdata[0], [0.4], marker='o', markersize=15, color="red")
+#plt.legend()
 
 from matplotlib.pyplot import savefig
 
 for k in range(0,times.size):
-    u.vec.FV().NumPy()[:] = rhodata[k,:]
+    #u.vec.FV().NumPy()[:] = rhodata[k,:]
     uu.vec.FV().NumPy()[:] = rhouncontrolled[k,:]
-    linea.set_xdata(agentsdata[k])
+    #linea.set_xdata(agentsdata[k])
  #   plt.ylim(0,1)
-    vplot.Redraw(autoscale=False)
+    #vplot.Redraw(autoscale=False)
     uplot.Redraw(autoscale=False)
     plt.ylim([0,1])
     plt.show(block=False)

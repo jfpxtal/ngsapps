@@ -28,7 +28,7 @@ def fprime(u):
     return -1 + 0*u
 
 order = 1
-maxh = 0.1
+maxh = 0.05
 tau = 0.01
 tend = 3 # 3.5
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
@@ -183,7 +183,7 @@ def HughesSolver(vels):
         K = cK*exp(-sigK*sqr(norm)) # posPart(1-norm/width)
         #g.Set(-2*(x-agents[0])*sigK*K)
         g.Set(K)
-#        g.Set(0*x)
+        g.Set(0*x)
 
         # IMEX Time integration
         aupw.Apply(u.vec,rhs)
@@ -374,12 +374,18 @@ with TaskManager():
 #    for k in range(Nopt):
     graderr = 1e10
 
-    while graderr > 0.25:
+    while graderr > 0.05:
 
         # Solve forward problem
         #        import cProfile
         #        cProfile.run('HughesSolver(vels)')
         [rhodata, phidata, agentsdata] = HughesSolver(vels)
+        
+#        pickler = pickle.Pickler(open ("rhodata_nocontrol.dat", "wb"))
+#        pickler.dump (rhodata)
+#        del pickler
+        
+#        afdlk
 
     #    from matplotlib.widgets import Slider
     #    fig_sol, (ax, ax_slider) = plt.subplots(2, 1, gridspec_kw={'height_ratios':[10, 1]})
@@ -460,7 +466,7 @@ pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
 pickler.dump (agentsdata)
 del pickler
 
-pickler = pickle.Pickler(open ("rhodata.dat", "wb"))
+pickler = pickle.Pickler(open ("rhodata_nocontrol.dat", "wb"))
 pickler.dump (rhodata)
 del pickler
 
