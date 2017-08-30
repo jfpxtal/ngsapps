@@ -18,28 +18,28 @@ class CrossDiffParams:
         self.Db = Db
         self.Vr = Vr
         self.Vb = Vb
-
-def CreateBilinearForm(fes, s, gridr,gridb):
-    r, b = fes.TrialFunction()
-    tr, tb = fes.TestFunction()
-    r2 = s.components[0]
-    b2 = s.components[1]
-    Dr = 0.1
-    Db = 0.1
-
-    a = BilinearForm(fes, symmetric=False)
-    a += SymbolicBFI(Dr*((1-r2-b2)*(grad(gridr)*r+gridr*grad(r))*grad(tr) + r2*gridr*(grad(r)+grad(b))*grad(tr)))
-    a += SymbolicBFI(Db*((1-r2-b2)*(grad(gridb)*b+gridb*grad(b))*grad(tb) + b2*gridb*(grad(r)+grad(b))*grad(tb)))
-#    a += SymbolicBFI(0.1*(grad(r)*grad(tr)+grad(b)*grad(tb))) # Regularization
-    return a
+#
+#def CreateBilinearForm(fes, s, gridr,gridb):
+#    r, b = fes.TrialFunction()
+#    tr, tb = fes.TestFunction()
+#    r2 = s.components[0]
+#    b2 = s.components[1]
+#    Dr = 0.1
+#    Db = 0.1
+#
+#    a = BilinearForm(fes, symmetric=False)
+#    a += SymbolicBFI(Dr*((1-r2-b2)*(grad(gridr)*r+gridr*grad(r))*grad(tr) + r2*gridr*(grad(r)+grad(b))*grad(tr)))
+#    a += SymbolicBFI(Db*((1-r2-b2)*(grad(gridb)*b+gridb*grad(b))*grad(tb) + b2*gridb*(grad(r)+grad(b))*grad(tb)))
+##    a += SymbolicBFI(0.1*(grad(r)*grad(tr)+grad(b)*grad(tb))) # Regularization
+#    return a
 
 order = 1
-maxh = 0.02
+maxh = 0.05
 
 convOrder = 1
 
 # time step and end
-tau = 0.00001
+tau = 0.001
 tend = -1
 
 
@@ -76,7 +76,7 @@ topMat = mesh.Materials('top')
 #fes1, fes = form.FESpace(mesh, order)
 fes1 = H1(mesh, order=order, flags={'definedon': ['top']})
 # calculations only on top mesh
-fes = FESpace([fes1, fes1], flags={'definedon': ['top']})
+fes = FESpace([fes1, fes1])
 
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
@@ -90,19 +90,21 @@ b2 = p.s.components[1]
 #r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 #b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 freq = 10
-r2.Set(2.0/3*(sin(freq*x)*sin(freq*y)+1))
-b2.Set(1.0/3*(cos(freq*x)*cos(freq*y)+1))
+r2.Set(2.0/3*0.5*(sin(freq*x)*sin(freq*y)+1))
+b2.Set(1.0/3*0.5*(cos(freq*x)*cos(freq*y)+1))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
-cdec = 15
-cdec2 = 5
+cdec = 5
+cdec2 = 15
+Dr = 1.0/100
+Db = 1.0/100
 
 if conv:
     # convolution
-#    thin = 200
-#    k0 = 20
-#    K = k0*exp(-thin*(sqr(x-xPar)+sqr(y-yPar)))
-    K = exp(-sqrt(x*x+y*y))
+    thin = 1
+    k0 = 1
+    K = k0*exp(-thin*(abs(x-xPar)+abs(y-yPar)))
+    #K = exp(-sqrt(sqr(x-xPar)*x+sqr(y-yPar)))
     convr = ParameterLF(fes1.TestFunction()*K, r2, convOrder)
     convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
 else:
@@ -115,12 +117,12 @@ gridr = grid.components[0]
 gridb = grid.components[1]
 
 with TaskManager():
-    gridr.Set(exp(-convr)+exp(convb))
-    gridb.Set(exp(convr)+exp(-convb))
+    gridr.Set(exp(-cdec*convr)+exp(cdec2*convb))
+    gridb.Set(exp(cdec2*convr)+exp(-cdec*convb))
 
 a = BilinearForm(fes, symmetric=False)
-a += SymbolicBFI((1-r2-b2)*(grad(gridr)*r+gridr*grad(r))*grad(tr) + r2*gridr*(grad(r)+grad(b))*grad(tr))
-a += SymbolicBFI((1-r2-b2)*(grad(gridb)*b+gridb*grad(b))*grad(tb) + b2*gridb*(grad(r)+grad(b))*grad(tb))
+a += SymbolicBFI((1-r2-b2)*(grad(gridr)*r+gridr*grad(r))*grad(tr) + r2*gridr*(grad(r)+0*grad(b))*grad(tr))
+a += SymbolicBFI((1-r2-b2)*(grad(gridb)*b+gridb*grad(b))*grad(tb) + b2*gridb*(0*grad(r)+grad(b))*grad(tb))
 
 # mass matrix
 m = BilinearForm(fes)
@@ -144,8 +146,9 @@ else:
     # visualize both species at the same time, red in top mesh, blue in bottom
     # translate density b2 of blue species to bottom mesh
     both = r2 + Compose((x, y-yoffset), b2, mesh)
+    bothgrid = gridr + Compose((x, y-yoffset), gridb, mesh)
     Draw(both, mesh, 'dynamic')
-
+    Draw(bothgrid, mesh, 'grid_r_b')
 
 #times = [0.0]
 #entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
@@ -162,15 +165,17 @@ else:
 # semi-implicit Euler
 input("Press any key")
 t = 0.0
+k = 0
 with TaskManager():
     while tend < 0 or t < tend - tau / 2:
 #        print("\nt = {:10.6e}".format(t))
         t += tau
+        k += 1
 
         if conv:
 #            print('Calculating convolution integrals...')
-            gridr.Set(exp(-cdec*convr)+exp(cdec2*convb))
-            gridb.Set(exp(cdec2*convr)+exp(-cdec*convb))
+            gridr.Set(Dr*(exp(-cdec*convr)+exp(cdec2*convb)))
+            gridb.Set(Db*(exp(cdec2*convr)+exp(-cdec*convb)))
 #        print('Assembling a...')
         a.Assemble()
 
@@ -179,15 +184,19 @@ with TaskManager():
         mstar.AsVector().data = m.mat.AsVector() + tau * a.mat.AsVector()
         invmat = mstar.Inverse(fes.FreeDofs())
         p.s.vec.data = invmat * rhs
+        
+        #r2 = p.s.components[0]
+        #b2 = p.s.components[1]
 
         if netmesh.dim == 1:
             rplot.Redraw()
             bplot.Redraw()
             plt.pause(0.05)
-        else:
+        elif k % 50 == 0:
             Redraw(blocking=False)
             
         print("\n mass r = {:10.6e}".format(Integrate(r2,mesh)) +  " mass b = {:10.6e}".format(Integrate(b2,mesh)) + "t = {:10.6e}".format(t))
+        #input("")
 
 #        ent = Integrate(entropy, mesh, definedon=topMat)
 #        l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
