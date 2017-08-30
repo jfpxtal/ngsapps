@@ -28,10 +28,13 @@ def limitValues(leftElVals, thisElVals, rightElVals, size):
                                          rightElVals['avg']-thisElVals['avg'], size)
     return newLVal, newRVal
 
-def stabilityLimiter(g, p1fes, plot):
+def stabilityLimiter(g, p1fes):
     fes = g.__reduce__()[1][0]
+    # red = fes.__reduce__()
+    # red[1][2].Set('order', 1)
+    # p1fes = FESpace(*red[1])
+    # p1fes.__setstate__(red[2])
     mesh = fes.mesh
-    #p1fes,_ = dgform.FESpace(mesh, mat, 1)
     p1gf = GridFunction(p1fes)
     p1gf.Set(g)
     ints = Integrate(g, mesh, element_wise=True)
@@ -80,10 +83,9 @@ def stabilityLimiter(g, p1fes, plot):
 
 from ngsolve.fem import BaseMappedIntegrationPoint
 
-def nonnegativityLimiter(g, p1fes, plot):
+def nonnegativityLimiter(g, p1fes):
     fes = g.__reduce__()[1][0]
     mesh = fes.mesh
-    #p1fes,_ = dgform.FESpace(mesh, mat, 1)
     p1gf = GridFunction(p1fes)
     p1gf.Set(g)
     setgf = GridFunction(fes)
