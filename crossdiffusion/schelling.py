@@ -34,12 +34,12 @@ class CrossDiffParams:
 #    return a
 
 order = 1
-maxh = 0.05
+maxh = 0.02
 
-convOrder = 1
+conv_order = 3
 
 # time step and end
-tau = 0.001
+tau = 0.005
 tend = -1
 
 
@@ -68,13 +68,23 @@ conv = True
 
 yoffset = -1.3
 #netmesh = geos.make1DMesh(maxh)
-netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
+#netmesh = geos.make2DMesh(maxh, yoffset, geos.square)
+#
+#mesh = Mesh(netmesh)
 
+geo = SplineGeometry()
+xmin, xmax = -1/2, 1/2
+ymin, ymax = -1/2, 1/2
+dx = xmax-xmin
+dy = ymax-ymin
+MakePeriodicRectangle(geo, (xmin, ymin), (xmax, ymax))
+netmesh = geo.GenerateMesh(maxh=maxh)
 mesh = Mesh(netmesh)
-topMat = mesh.Materials('top')
+
+#topMat = mesh.Materials('top')
 
 #fes1, fes = form.FESpace(mesh, order)
-fes1 = H1(mesh, order=order, flags={'definedon': ['top']})
+fes1 = Periodic(H1(mesh, order=order)) #, flags={'definedon': ['top']}))
 # calculations only on top mesh
 fes = FESpace([fes1, fes1])
 
@@ -90,39 +100,66 @@ b2 = p.s.components[1]
 #r2.Set(0.5*exp(-pow(x-0.1, 2)-pow(y-0.25, 2)))
 #b2.Set(0.5*exp(-pow(x-1.9, 2)-0.1*pow(y-0.5, 2)))
 freq = 10
-r2.Set(2.0/3*0.5*(sin(freq*x)*sin(freq*y)+1))
-b2.Set(1.0/3*0.5*(cos(freq*x)*cos(freq*y)+1))
+#r2.Set(2.0/3*0.5*(sin(freq*x)*sin(freq*y)+1))
+#b2.Set(1.0/3*0.5*(cos(freq*x)*cos(freq*y)+1))
+
+r2.Set(RandomCF(0, 0.49))
+b2.Set(RandomCF(0, 0.49))
 #r2.Set(0.5+0*x)
 #b2.Set(0.5+0*x)
-cdec = 5
-cdec2 = 15
-Dr = 1.0/100
-Db = 1.0/100
+cdec = 10
+cdec2 = 5
+#Dr = 1.0/100
+#Db = 1.0/100
+
 
 if conv:
     # convolution
-    thin = 1
+    thin = 40
     k0 = 1
-    K = k0*exp(-thin*(abs(x-xPar)+abs(y-yPar)))
+    mK = Integrate(k0*exp(-thin*sqrt(sqr(x)+sqr(y))), mesh)
+    k0 = k0/mK
+    K = k0*exp(-thin*sqrt(sqr(x-xPar)+sqr(y-yPar))) #/mK
+    print("mK = " + str(mK))
+    K = CompactlySupportedKernel(0.05)
+
     #K = exp(-sqrt(sqr(x-xPar)*x+sqr(y-yPar)))
-    convr = ParameterLF(fes1.TestFunction()*K, r2, convOrder)
-    convb = ParameterLF(fes1.TestFunction()*K, b2, convOrder)
+    convr = ParameterLF(fes1.TestFunction()*K, r2, conv_order, repeat=0, patchSize=[dx, dy])
+    convb = ParameterLF(fes1.TestFunction()*K, b2, conv_order, repeat=0, patchSize=[dx, dy])
 else:
+    asd
     convr = 0
     convb = 0
+    
 
-# GridFunctions for caching of convolution values and automatic gradient calculation
+kernel = GridFunction(fes1)
+kernel.Set(k0*exp(-thin*sqrt(sqr(x)+sqr(y))))
+Draw(kernel,mesh,'K')
+
 grid = GridFunction(fes)
 gridr = grid.components[0]
 gridb = grid.components[1]
 
+tmp = GridFunction(fes)
+Dr = tmp.components[0]
+Db = tmp.components[1]
+
+# GridFunctions for caching of convolution values and automatic gradient calculation
+
 with TaskManager():
-    gridr.Set(exp(-cdec*convr)+exp(cdec2*convb))
-    gridb.Set(exp(cdec2*convr)+exp(-cdec*convb))
+    gridr.Set(convr)
+    gridb.Set(convb)
+    
+Dr.Set(1./10*(exp(-cdec*gridr+cdec2*gridb)))
+Db.Set(1./10*(exp(cdec2*gridr-cdec*gridb)))
+   
 
 a = BilinearForm(fes, symmetric=False)
-a += SymbolicBFI((1-r2-b2)*(grad(gridr)*r+gridr*grad(r))*grad(tr) + r2*gridr*(grad(r)+0*grad(b))*grad(tr))
-a += SymbolicBFI((1-r2-b2)*(grad(gridb)*b+gridb*grad(b))*grad(tb) + b2*gridb*(0*grad(r)+grad(b))*grad(tb))
+a += SymbolicBFI((1-r2-b2)*(grad(Dr)*r+Dr*grad(r))*grad(tr) + r2*Dr*(grad(r)+grad(b))*grad(tr))
+a += SymbolicBFI((1-r2-b2)*(grad(Db)*b+Db*grad(b))*grad(tb) + b2*Db*(grad(r)+grad(b))*grad(tb))
+#Deps= 1
+#a += SymbolicBFI(Dr*(Deps*((1-r2-b2)*grad(r) + r2*(grad(r)+grad(b))) + r2*(1-r2-b2)*(-cdec*grad(gridr)+cdec2*grad(gridb)))*grad(tr))
+#a += SymbolicBFI(Db*(Deps*((1-r2-b2)*grad(b) + b2*(grad(r)+grad(b))) + b2*(1-r2-b2)*(-cdec*grad(gridb)+cdec2*grad(gridr)))*grad(tb))
 
 # mass matrix
 m = BilinearForm(fes)
@@ -141,26 +178,18 @@ if netmesh.dim == 1:
     bplot = Plot(b2, 'b')
     plt.show(block=False)
 else:
-    # Draw(r2, mesh, 'r')
-    # Draw(b2, mesh, 'b')
+    Draw(r2, mesh, 'r')
+    Draw(b2, mesh, 'b')
     # visualize both species at the same time, red in top mesh, blue in bottom
     # translate density b2 of blue species to bottom mesh
-    both = r2 + Compose((x, y-yoffset), b2, mesh)
-    bothgrid = gridr + Compose((x, y-yoffset), gridb, mesh)
-    Draw(both, mesh, 'dynamic')
-    Draw(bothgrid, mesh, 'grid_r_b')
-
-#times = [0.0]
-#entropy = rinfty*ZLogZCF(r2/rinfty) + binfty*ZLogZCF(b2/binfty) + (1-rinfty-binfty)*ZLogZCF((1-r2-b2)/(1-rinfty-binfty)) + r2*gridr + b2*gridb
-#ents = [Integrate(entropy, mesh, definedon=topMat)]
-#fig, ax = plt.subplots()
-#fig.canvas.set_window_title('entropy')
-#line, = ax.plot(times, ents)
-#plt.show(block=False)
-
-#outfile = open('order{}_maxh{}_form{}_conv{}.csv'.format(order, maxh, form, conv), 'w')
-#outfile.write('time, entropy, l2sq_to_equi_r, l2sq_to_equi_b\n')
-
+    #both = r2 + Compose((x, y-yoffset), b2, mesh)
+    #bothgrid = gridr + Compose((x, y-yoffset), gridb, mesh)
+    Draw(gridr, mesh, 'G*r')
+    Draw(gridb, mesh, 'G*b')
+    Draw(Dr, mesh, 'Dr')
+    Draw(Db, mesh, 'Db')
+#    Draw(convr, mesh, 'convr')
+#    Draw(convb, mesh, 'convb')
 
 # semi-implicit Euler
 input("Press any key")
@@ -173,10 +202,10 @@ with TaskManager():
         k += 1
 
         if conv:
-#            print('Calculating convolution integrals...')
-            gridr.Set(Dr*(exp(-cdec*convr)+exp(cdec2*convb)))
-            gridb.Set(Db*(exp(cdec2*convr)+exp(-cdec*convb)))
-#        print('Assembling a...')
+            gridr.Set(convr)
+            gridb.Set(convb)  # print('Assembling a...')
+            Dr.Set(1./10*(exp(-cdec*gridr+cdec2*gridb)))
+            Db.Set(1./10*(exp(cdec2*gridr-cdec*gridb))) 
         a.Assemble()
 
         rhs.data = m.mat * p.s.vec
@@ -185,18 +214,20 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         p.s.vec.data = invmat * rhs
         
-        #r2 = p.s.components[0]
-        #b2 = p.s.components[1]
+        r2 = p.s.components[0]
+        b2 = p.s.components[1]
 
         if netmesh.dim == 1:
             rplot.Redraw()
             bplot.Redraw()
             plt.pause(0.05)
-        elif k % 50 == 0:
+        elif k % 1 == 0:
             Redraw(blocking=False)
+
+        input("")
             
         print("\n mass r = {:10.6e}".format(Integrate(r2,mesh)) +  " mass b = {:10.6e}".format(Integrate(b2,mesh)) + "t = {:10.6e}".format(t))
-        #input("")
+        
 
 #        ent = Integrate(entropy, mesh, definedon=topMat)
 #        l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)
