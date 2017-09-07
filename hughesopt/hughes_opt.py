@@ -28,34 +28,31 @@ def fprime(u):
 
 ngsglobals.msg_level = 0
 plotmod = 1000
+plotting = True
 
 order = 1
-maxh = 0.05
 tau = 0.01
 tend = 3 # 3.5
-times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
 vtkoutput = False
 
-del1 = 0.1 # Regularization parameters
+# Regularization parameters
+del1 = 0.1
 del2 = 0.1
 D = 0.05
+alpha = 0.01
 
-Na = 1 # Number of agents
-width = 1 # width of conv kernel
-alpha = 0.01 # Regularization parameter
 cK = 1 # Parameter to control strength of attraction
 sigK = 2 # Sigma of exponential conv kernel
-vels = 0.8*np.ones((Na,times.size)) # Position of agents
+width = 1 # width of conv kernel
+
+# Gradient descent
+otau = 1
 
 eta = 5 # Penalty parameter
 
 
 usegeo = "circle"
 usegeo = "1d"
-
-plotting = True
-
-radius = 8
 
 if usegeo == "circle":
     radius = 4
@@ -90,13 +87,13 @@ vels = np.zeros((times.size, Na, mesh.dim)) # Inital velocity of agents
 
 def K(agent):
     if mesh.dim == 1:
-        return cK*exp(-sigK*(sqr(x-agent)))
+        return cK*exp(-sigK*(sqr(x-agent[0])))
     else:
         return cK*exp(-sigK*(sqr(x-agent[0])+sqr(y-agent[1])))
 
 def Kprime(agent):
     if mesh.dim == 1:
-        return [2*sigK*K(agent)*(x-agent)]
+        return [2*sigK*K(agent)*(x-agent[0])]
     else:
         return 2*sigK*K(agent)*CoefficientFunction((x-agent[0], y-agent[1]))
 
@@ -115,8 +112,6 @@ phi = GridFunction(fes)
 lam1 = GridFunction(fes)
 lam2 = GridFunction(fes)
 
-tmp = GridFunction(fes)
-phi_rhs = GridFunction(fes)
 q = phi.vec.CreateVector()
 q2 = phi.vec.CreateVector()
 
@@ -186,11 +181,10 @@ invmat = mstar.Inverse(fes.FreeDofs())
 # Explicit Euler
 def HughesSolver(vels):
     # Initial data
-    mi = 1# Integrate(unitial, mesh)
-    u.Set(1/mi*u_init)
-    agents = np.array([1.0]) # Initial pos agents
-    phi.Set(5-abs(x))
-    rhodata = np.zeros([times.size, u.vec.size])
+    u.Set(u_init)
+    agents = ag_init[:]
+    phi.Set(phi_init)
+    rhodata = []
     phidata = []
     agentsdata = np.empty_like(vels)
 
@@ -213,7 +207,7 @@ def HughesSolver(vels):
         # Update Agents positions (expl. Euler)
         agents += tau*vels[k,:,:]
 
-        rhodata[k,:]= u.vec.FV().NumPy()[:]
+        rhodata.append(u.vec.FV()[:])
         phidata.append(phi.vec.FV()[:])
         agentsdata[k,:,:] = agents
 
@@ -232,7 +226,7 @@ def HughesSolver(vels):
                 phiplot.Redraw()
                 gplot.Redraw()
                 plt.pause(0.001)
-                #print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)))
+                #print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
         else:
             Redraw(blocking=False)
 
@@ -269,7 +263,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
     for k in range(len(times)):
         # Read data, backward in time (already reversed)
-        u.vec.FV().NumPy()[:] = rhodata[k]
+        u.vec.FV()[:] = rhodata[k]
         phi.vec.FV()[:] = phidata[k]
         agents = agentsdata[k,:,:]
 
@@ -392,8 +386,11 @@ if plotting:
     plt.show(block=False)
 
 k = 0
+maxk = 1e5
+graderr = 1e12
+Vopt = []
 with TaskManager():
-    while True:
+    while graderr > 1e-2 and k < maxk:
 
         # Solve forward problem
         rhodata, phidata, agentsdata = HughesSolver(vels)
@@ -412,9 +409,9 @@ with TaskManager():
             ax.relim()
             ax.autoscale_view()
 
-            linev_x.set_ydata(Vs)
-            axv.relim()
-            axv.autoscale_view()
+        linev_x.set_ydata(Vs)
+        axv.relim()
+        axv.autoscale_view()
 
         # Update velocities
         vels -= otau*nvels
@@ -427,10 +424,8 @@ with TaskManager():
 
         # Evaluate Functional
         J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
-        print('Functional J_1 = ' + str(J1))
         J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
         J = J1 + J2
-        print('FunctionalJ = ' + str(J))
 
         if plotting:
             lJ1.set_xdata(list(range(k+1)))
@@ -443,7 +438,8 @@ with TaskManager():
             axJ.autoscale_view()
             plt.pause(0.001)
 
-        print('Functional J = ' + str(J) + ' Gradient = ' + str(graderr) + '\n')
+        print('Functional J = ' + str(J) + ' Gradient = ' + str(graderr))
+        k += 1
     #    input("press key")
         #print(agentsdata)
 
@@ -462,14 +458,13 @@ del pickler
 pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
 pickler.dump (agentsdata)
 del pickler
-
-pickler = pickle.Pickler(open ("rhodata_nocontrol.dat", "wb"))
-pickler.dump (rhodata)
+pickler = pickle.Pickler(open ("rhodata.dat", "wb"))
+pickler.dump (np.asarray(rhodata))
 del pickler
 
-pickler = pickle.Pickler(open ("Jdata.dat", "wb"))
-pickler.dump (Jopt)
-del pickler
+#pickler = pickle.Pickler(open ("Jdata.dat", "wb"))
+#pickler.dump (Jopt)
+#del pickler
 
 
 #unpickler = pickle.Unpickler(open ("rhodata.dat", "rb"))

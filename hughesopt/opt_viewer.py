@@ -94,10 +94,10 @@ unpickler = pickle.Unpickler(open ("agentsdata.dat", "rb"))
 agentsdata = unpickler.load()
 del unpickler
 
-unpickler = pickle.Unpickler(open ("Jdata.dat", "rb"))
-Jopt = unpickler.load()
-del unpickler
- 
+#unpickler = pickle.Unpickler(open ("Jdata.dat", "rb"))
+#Jopt = unpickler.load()
+#del unpickler
+# 
  
 # Interactive Plot
 #from matplotlib.widgets import Slider
@@ -129,28 +129,27 @@ del unpickler
 #metadata = dict(title='Movie Test', artist='Matplotlib',
                 #comment='Movie support!')
 #writer = FFMpegWriter(fps=15, metadata=metadata)
-
 ax = plt.gca()
 #plt.axes([0, 1, 0, 1])
-#vplot = Plot(u, ax=ax, mesh=mesh,linewidth=4,label='contr')
+vplot = Plot(u, ax=ax, mesh=mesh,linewidth=4,label='contr')
 uplot = Plot(uu, ax=ax, mesh=mesh,linewidth=4,label='uncontr')
-#linea, = ax.plot(agentsdata[0], [0.4], marker='o', markersize=15, color="red")
+linea, = ax.plot(agentsdata[0], [0.4], marker='o', markersize=15, color="red")
 #plt.legend()
 
 from matplotlib.pyplot import savefig
 
 for k in range(0,times.size):
-    #u.vec.FV().NumPy()[:] = rhodata[k,:]
+    u.vec.FV().NumPy()[:] = rhodata[k,:]
     uu.vec.FV().NumPy()[:] = rhouncontrolled[k,:]
-    #linea.set_xdata(agentsdata[k])
+    linea.set_xdata(agentsdata[k])
  #   plt.ylim(0,1)
-    #vplot.Redraw(autoscale=False)
+    vplot.Redraw(autoscale=False)
     uplot.Redraw(autoscale=False)
     plt.ylim([0,1])
     plt.show(block=False)
-    
+    plt.pause(0.001)
  #   writer.grab_frame()
-    savefig('png/hughesopt_' + str(k) + '.png')
+    #savefig('png/hughesopt_' + str(k) + '.png')
     
 #from subprocess import call
 #call("")
