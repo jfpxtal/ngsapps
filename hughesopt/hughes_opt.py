@@ -19,6 +19,8 @@ from rungekutta import *
 
 import pickle
 
+ngsglobals.msg_level = 0
+
 def f(u):
     return 1-u
 
@@ -74,15 +76,15 @@ elif usegeo == "1d":
     xshift = 2
     u_init = 0.8*exp(-(sqr(x-xshift)+y*y))
     phi_init = 5-abs(x)
-    ag_init = [(0,)]
+    ag_init = [(1,)]
 
 mesh = Mesh(netgenMesh)
 
 Na = len(ag_init) # Number of agents
 
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
-vels = np.zeros((times.size, Na, mesh.dim)) # Inital velocity of agents
-# vels = 0.8*np.ones((times.size, Na, mesh.dim))
+#vels = np.zeros((times.size, Na, mesh.dim)) # Inital velocity of agents
+vels = 0.8*np.ones((times.size, Na, mesh.dim))
 # vels = -0.5*np.ones((times.size, Na, mesh.dim))
 
 def K(agent):
