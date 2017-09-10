@@ -16,7 +16,7 @@ import numpy as np
 
 #from geometries import *
 from ngsapps.plotting import *
-from limiter import *
+from ngsapps.limiter import *
 
 ngsglobals.msg_level = 0
 
@@ -62,6 +62,7 @@ mesh = Mesh(netgenMesh)
 
 # finite element space
 fes = L2(mesh, order=order, flags={'dgjumps': True})
+p1fes = L2(mesh, order=1, flags={'dgjumps': True})
 v = fes.TrialFunction()
 w = fes.TestFunction()
 
@@ -283,8 +284,8 @@ with TaskManager():
         u.vec.data = invmat * rhs
         
         if netgenMesh.dim == 1:
-            stabilityLimiter(u, fes, uplot)
-            nonnegativityLimiter(u, fes, uplot)
+            stabilityLimiter(u, p1fes)
+            nonnegativityLimiter(u, p1fes)
             
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))

@@ -3,12 +3,12 @@ from ngsolve import *
 
 from ngsapps.utils import *
 from ngsapps.plotting import *
+from ngsapps.limiter import *
 
 import matplotlib.pyplot as plt
 
 import geometries as geos
 from stationary import *
-from limiter import *
 from dgform import DGFormulation
 from cgform import CGFormulation
 
@@ -58,6 +58,7 @@ Plot(p.Vr, mesh=mesh)
 plt.figure()
 
 fes1, fes = form.FESpace(mesh, topMat, order)
+p1fes,_ = form.FESpace(mesh, topMat, 1)
 r, b = fes.TrialFunction()
 tr, tb = fes.TestFunction()
 
@@ -166,10 +167,10 @@ with TaskManager():
         p.s.vec.data = invmat * rhs
 
         # flux limiters
-        # stabilityLimiter(r2, form, topMat, rplot)
-        # stabilityLimiter(b2, form, topMat, bplot)
-        # nonnegativityLimiter(r2, form, topMat, rplot)
-        # nonnegativityLimiter(b2, form, topMat, bplot)
+        # stabilityLimiter(r2, p1fes)
+        # stabilityLimiter(b2, p1fes)
+        # nonnegativityLimiter(r2, p1fes)
+        # nonnegativityLimiter(b2, p1fes)
 
         ent = Integrate(entropy, mesh, definedon=topMat)
         l2r = Integrate(sqr(rinfty-r2), mesh, definedon=topMat)

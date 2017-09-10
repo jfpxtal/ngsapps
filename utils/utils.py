@@ -73,7 +73,7 @@ def GenerateGridMesh(p1, p2, N, M, bc=1, bcs=None):
 
     return netmesh
 
-def Make1DMesh(start, end, maxh):
+def Make1DMesh(start, end, maxh, periodic=False):
     netmesh = NetMesh()
     netmesh.dim = 1
     L = end-start
@@ -90,6 +90,9 @@ def Make1DMesh(start, end, maxh):
     netmesh.Add(Element0D(pnums[0], index=1))
     netmesh.Add(Element0D(pnums[N], index=2))
     netmesh.SetMaterial(1, 'top')
+    if periodic:
+        netmesh.AddPointIdentification(pnums[0], pnums[-1], 1, 2)
+
     return netmesh
 
 def MakePeriodicRectangle(geo, p1, p2, bc=None, bcs=None, **args):

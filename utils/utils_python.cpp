@@ -204,6 +204,7 @@ void ExportNgsAppsUtils(py::module &m)
 
     ;
 
+  m.def("Project", &project);
   m.def("Limit", &limit);
 }
 

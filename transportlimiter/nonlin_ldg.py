@@ -14,7 +14,7 @@ import numpy as np
 
 from ngsapps.utils import *
 from ngsapps.plotting import *
-from limiter import *
+from ngsapps.limiter import *
 from rungekutta import *
 
 ngsglobals.msg_level = 1

@@ -14,20 +14,20 @@ import numpy as np
 
 from ngsapps.utils import *
 from ngsapps.plotting import *
-from limiter import *
+from ngsapps.limiter import *
 from rungekutta import *
 
 ngsglobals.msg_level = 1
 
-# order = 3
-# maxh = 0.01
+maxh = 0.01
+tau = 0.001
+order = 3
+# maxh = 0.02
 # tau = 0.001
-order = 1
-maxh = 0.02
-tau = 0.0001
 tend = -1
 
 usegeo = "square"
+usegeo = "1d"
 
 if usegeo == "circle":
     geo = SplineGeometry()
@@ -39,10 +39,11 @@ elif usegeo == "square":
     netgenMesh = unit_square.GenerateMesh(maxh=maxh)
 
 mesh = Mesh(netgenMesh)
-#mesh.Curve(order)
+# mesh.Curve(order)
 
 # finite element space
 fes = L2(mesh, order=order, flags={'dgjumps': True})
+p1fes = L2(mesh, order=1, flags={'dgjumps': True})
 v = fes.TrialFunction()
 w = fes.TestFunction()
 
@@ -89,15 +90,19 @@ a += SymbolicBFI(-v*(1-v)*beta*grad(w))
 a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
 a += SymbolicBFI(phiR*w, BND, skeleton=True)
 
-etaf = abs(beta*n)
-phi = 0.5*v*(1-v)*beta*n
-phi += 0.25*etaf*(v-v.Other(0))
+# new semi-implicit
+# etaf = abs(beta*n)
+# phi = 0.5*(v*(1-u) + v.Other(0)*(1-u.Other()))*beta*n
+# phi += 0.5*etaf*(v-v.Other(0))
 
-phiR = IfPos(beta*n, beta*n*IfPos(v-0.5, 0.25, v*(1-v)), 0)
+# phiR = IfPos(beta*n, beta*n*IfPos(u-0.5, 0.25, u*(1-u)), 0)
 
-a += SymbolicBFI(-v*(1-v)*beta*grad(w))
-a += SymbolicBFI(phi*(w - w.Other()), element_boundary=True)
-a += SymbolicBFI(phiR*w, BND, skeleton=True)
+# a += SymbolicBFI(-v*(1-u)*beta*grad(w))
+# a += SymbolicBFI(phi*(w - w.Other()), skeleton=True)
+# # boundary term needs to be explicit, because it is nonlinear
+# # fully explicit -> no longer depends on v -> LinearForm
+# f = LinearForm(fes)
+# f += SymbolicLFI(phiR*w, BND, skeleton=True)
 
 # semi-implicit
 # etaf = abs(beta*n)
@@ -148,8 +153,8 @@ rhs = u.vec.CreateVector()
 rhs2 = u.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-# u.Set(0.9*exp(-2*(x*x+y*y)))
-u.Set(0.9*exp(-10*(sqr(x-0.5)+sqr(y-0.5))))
+u.Set(0.9*exp(-2*(x*x+y*y)))
+# u.Set(0.9*exp(-10*(sqr(x-0.5)+sqr(y-0.5))))
 uc.Set(0.5+0*x)
 # u.Set(CoefficientFunction(0.4))
 
@@ -171,7 +176,6 @@ def step(t, y):
 
 input("Press any key...")
 
-# Explicit Euler
 t = 0.0
 k = 0
 with TaskManager():
@@ -198,9 +202,9 @@ with TaskManager():
         # invmat = mstar.Inverse(fes.FreeDofs())
         # u.vec.data = invmat * rhs
 
-        # stabilityLimiter(u, fes, uplot)
-        # nonnegativityLimiter(u, fes, uplot)
-        Limit(u, 1, 0.1, maxh)
+        stabilityLimiter(u, fes)
+        nonnegativityLimiter(u, fes)
+        # Limit(u, p1fes, 1, 1, maxh, True)
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
@@ -214,5 +218,3 @@ with TaskManager():
         else:
             Redraw(blocking=False)
         # input()
-
-

@@ -15,6 +15,6 @@ add_ngsolve_python_module(libngsapps_utils
 install(TARGETS libngsapps_utils DESTINATION .)
 
 install (FILES
-        utils.py meshtools.py merge_meshes.py plotting.py
+        utils.py meshtools.py merge_meshes.py plotting.py limiter.py
         DESTINATION .
         )

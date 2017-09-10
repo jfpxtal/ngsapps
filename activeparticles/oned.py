@@ -4,14 +4,16 @@ from ngsapps.utils import *
 import matplotlib.pyplot as plt
 import numpy as np
 from ngsapps.plotting import *
+from ngsapps.limiter import *
 
-order = 3
+order = 1
 maxh = 1
 
 vtkoutput = False
 
 # time step and end
 tau = 50
+# tau = 50000
 tend = -1
 
 # diffusion coefficient for rho
@@ -24,45 +26,70 @@ alpha = 0.38
 # positive parameters which ensure that, at steady state
 # and in the absence of any density or velocity gradients,
 # W vanishes everywhere
+# gamma1 = 0.06
 gamma1 = 0.04
 gamma2 = 0
 
 # effective diffusion coefficent for W
 # ensures continuity of this field
 k = 0.06
+# k = 0
 
 # self-advection
 w1 = 0
 # active pressure, >0
 w2 = 10
+# w2 = 0
 
-netmesh = NetMesh()
-netmesh.dim = 1
-L = 600
-N = int(600/maxh)
-pnums = []
-for i in range(0, N + 1):
-    pnums.append(netmesh.Add(MeshPoint(Pnt(L * i / N, 0, 0))))
-
-for i in range(0, N):
-    netmesh.Add(Element1D([pnums[i], pnums[i + 1]], index=1))
-
-netmesh.Add(Element0D(pnums[0], index=1))
-netmesh.Add(Element0D(pnums[N], index=2))
-netmesh.AddPointIdentification(pnums[0], pnums[-1], 1, 2)
-mesh = Mesh(netmesh)
+mesh = Mesh(Make1DMesh(0, 600, maxh, True))
+# mesh = Mesh(Make1DMesh(-50, 300, 0.2, True))
 
 v0 = 0.2
 vmin = 0.001
-v = IfPos(100-x, v0,
+
+# # full profile, discontinuous
+# v = IfPos(100-x, v0,
+#             IfPos(200-x, vmin+(x/100-1)*(v0-vmin),
+#                 IfPos(400-x, v0,
+#                         IfPos(500-x, v0+(x/100-4)*(vmin-v0), v0))))
+
+# vdx = IfPos(100-x, 0,
+#             IfPos(200-x, (v0-vmin)/100,
+#                     IfPos(400-x, 0,
+#                         IfPos(500-x, (vmin-v0)/100, 0))))
+
+# full profile, continuous
+smear = 10
+v = IfPos(100-smear-x, v0,
+          IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
             IfPos(200-x, vmin+(x/100-1)*(v0-vmin),
                 IfPos(400-x, v0,
-                        IfPos(500-x, v0+(x/100-4)*(vmin-v0), v0))))
+                        IfPos(500-x, v0+(x/100-4)*(vmin-v0),
+                              IfPos(500+smear-x, vmin+(x-500)/smear*(v0-vmin), v0))))))
 
-vdx = IfPos(100-x, 0,
+vdx = IfPos(100-smear-x, 0,
+          IfPos(100-x, (vmin-v0)/smear,
             IfPos(200-x, (v0-vmin)/100,
-                    IfPos(400-x, 0,
-                        IfPos(500-x, (vmin-v0)/100, 0))))
+                IfPos(400-x, 0,
+                        IfPos(500-x, (vmin-v0)/100,
+                              IfPos(500+smear-x, (v0-vmin)/smear, 0))))))
+
+# single sawtooth, discontinuous
+# v = IfPos(100-x, v0,
+#             IfPos(200-x, vmin+(x-100)/100*(v0-vmin), v0))
+
+# vdx = IfPos(100-x, 0,
+#             IfPos(200-x, (v0-vmin)/100, 0))
+
+# # single sawtooth, continuous
+# smear = 10
+# v = IfPos(100-smear-x, v0,
+#             IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
+#                 IfPos(200-x, vmin+(x-100)/100*(v0-vmin), v0)))
+
+# vdx = IfPos(100-smear-x, 0,
+#             IfPos(100-x, (vmin-v0)/smear,
+#                 IfPos(200-x, (v0-vmin)/100, 0)))
 
 fesRho = Periodic(H1(mesh, order=order))
 fesW = Periodic(H1(mesh, order=order-1))
@@ -85,21 +112,24 @@ gradnormWsq = 2*gW*grad(W)
 grho.Set(CoefficientFunction(1))
 gW.Set(CoefficientFunction(0))
 
+n = specialcf.normal(mesh.dim)
+
 a = BilinearForm(fes)
 
 # equation for rho
 # TODO: boundary terms from partial integration?
 # TODO: separate terms which need to be reassembled at every time step
 a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
+# a += SymbolicBFI(-vbar*W*n*trho + DT*grad(rho)*n*trho, BND)
 # a += SymbolicBFI(-gradvbar*W*trho - vbar*grad(W)*trho - DT*grad(rho)*grad(trho))
 
 # equation for W
-# a += SymbolicBFI(0.5*vbar*rho*grad(tW) - gamma1*W*tW
-#                  -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(tW)
-#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
-a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
+a += SymbolicBFI(0.5*vbar*rho*grad(tW) - gamma1*W*tW
                  -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(tW)
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
+# a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
+#                  -gamma2*sqr(gW)*W*tW - k*grad(W)*grad(tW)
+#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 
 m = BilinearForm(fes)
 m += SymbolicBFI(rho*trho + W*tW)
@@ -112,6 +142,7 @@ mstar = m.mat.CreateMatrix()
 mplmesh = MPLMesh1D(mesh)
 mplmesh.Plot(v/v0)
 lineRho = mplmesh.Plot(grho)
+plt.figure()
 lineW = mplmesh.Plot(gW/grho)
 plt.show(block=False)
 
@@ -134,6 +165,10 @@ with TaskManager():
         mstar.AsVector().data = m.mat.AsVector() - tau*a.mat.AsVector()
         invmat = mstar.Inverse(fes.FreeDofs())
         g.vec.data = invmat * rhs
+
+        # stabilityLimiter(grho, p1fes)        nope, need L2 DG
+        # stabilityLimiter(gW, p1fes)
+        # nonnegativityLimiter(grho, p1fes)
 
         if k % 20 == 0:
             lineRho.Redraw()

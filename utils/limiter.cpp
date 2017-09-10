@@ -27,7 +27,14 @@ double negPart(double x)
   return -(x < 0)*x;
 }
 
-void project(const FESpace::Element &el, const BaseMappedIntegrationRule &mir, const FlatMatrix<> &shape, const FlatVector<> &coeffs, shared_ptr<GridFunction> res, LocalHeap &lh)
+void project(shared_ptr<GridFunction> gf, shared_ptr<GridFunction> res)
+{
+  LocalHeap glh(100000, "project lh");
+  auto mass = GetIntegrators().CreateBFI("mass", gf->GetFESpace()->GetSpacialDimension(), make_shared<ConstantCoefficientFunction>(1.0));
+  CalcFluxProject(*gf, *res, mass, false, -1, glh);
+}
+
+void projectSingleEl(const FESpace::Element &el, const BaseMappedIntegrationRule &mir, const FlatMatrix<> &shape, const FlatVector<> &coeffs, shared_ptr<GridFunction> res, LocalHeap &lh)
 {
   const auto &fel = el.GetFE();
   FlatMatrix<> comb_shape = Trans(shape)*coeffs | lh;
@@ -49,7 +56,7 @@ void project(const FESpace::Element &el, const BaseMappedIntegrationRule &mir, c
   }
 
   if (mir.GetTransformation().IsCurvedElement())
-    throw Exception("limiter project curved el");
+    throw Exception("limiter projectSingleEl curved el");
 
   IntegrationRule ir(fel.ElementType(), 0);
   BaseMappedIntegrationRule & mmir = mir.GetTransformation()(ir, lh);
@@ -171,7 +178,7 @@ void limit(shared_ptr<GridFunction> u, shared_ptr<FESpace> p1fes, double theta, 
             ir_facet[i].Point()[1] = 1-2*ir[i].Point()[0];
           }
           trig.CalcShape(ir_facet, lag_shape);
-          project(el, mir, lag_shape, delta, u, lh);
+          projectSingleEl(el, mir, lag_shape, delta, u, lh);
         }
       }
 
@@ -219,7 +226,7 @@ void limit(shared_ptr<GridFunction> u, shared_ptr<FESpace> p1fes, double theta, 
           ScalarFE<ET_TRIG,1> trig;
           FlatMatrix<> lag_shape(3, ir.GetNIP(), lh);
           trig.CalcShape(ir, lag_shape);
-          project(el, mir, lag_shape, vvals, u, lh);
+          projectSingleEl(el, mir, lag_shape, vvals, u, lh);
 
         }
       }

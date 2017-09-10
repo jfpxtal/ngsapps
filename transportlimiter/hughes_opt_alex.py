@@ -45,24 +45,26 @@ sigK = 2 # Sigma of exponential conv kernel
 width = 1 # width of conv kernel
 
 # Gradient descent
-otau = 0.3
+otau = 0.6
 
 eta = 5 # Penalty parameter
 
 
 usegeo = "circle"
-usegeo = "1d"
+# usegeo = "1d"
 
 if usegeo == "circle":
     radius = 4
-    maxh = 0.25
+    maxh = 0.15
     geo = SplineGeometry()
     geo.AddCircle ( (0.0, 0.0), r=radius, bc="cyl")
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 
-    u_init = 0.8*exp(-(sqr(x)+sqr(y)))
-    phi_init = 8-norm(x, y)
-    ag_init = [(1,1),(-1,-1)]
+    u_init = 0.8*exp(-(sqr(x+1)+0.2*sqr(y)))
+    # u_init += 0.8*exp(-(sqr(x+1)+sqr(y-1)))
+    # u_init += 0.8*exp(-(sqr(x)+sqr(y)))
+    phi_init = radius-norm(x, y)
+    ag_init = [(1,1),(1,-1)]
 
 elif usegeo == "1d":
     radius = 8
@@ -70,17 +72,17 @@ elif usegeo == "1d":
     netgenMesh = Make1DMesh(-radius, radius, maxh)
 
     # initial data
-    xshift = 2
-    u_init = 0.8*exp(-(sqr(x-xshift)+y*y))
-    phi_init = 5-abs(x)
-    ag_init = [(0,)]
+    u_init = 0.8*exp(-(sqr(x-3)))+0.8*exp(-(sqr(x-6)))
+    phi_init = radius-abs(x)
+    ag_init = [(3,)]
 
 mesh = Mesh(netgenMesh)
 
 Na = len(ag_init) # Number of agents
 
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
-vels = np.zeros((times.size, Na, mesh.dim)) # Inital velocity of agents
+# Inital velocity of agents
+vels = np.zeros((times.size, Na, mesh.dim))
 # vels = 0.8*np.ones((times.size, Na, mesh.dim))
 # vels = -0.5*np.ones((times.size, Na, mesh.dim))
 
@@ -183,8 +185,8 @@ def HughesSolver(vels):
     u.Set(u_init)
     agents = ag_init[:]
     phi.Set(phi_init)
-    rhodata = []
-    phidata = []
+    rhodata = np.empty((len(times), u.vec.size))
+    phidata = np.empty_like(rhodata)
     agentsdata = np.empty_like(vels)
 
     for k, t in enumerate(times):
@@ -206,8 +208,8 @@ def HughesSolver(vels):
         # Update Agents positions (expl. Euler)
         agents += tau*vels[k,:,:]
 
-        rhodata.append(u.vec.FV()[:])
-        phidata.append(phi.vec.FV()[:])
+        rhodata[k,:] = u.vec[:]
+        phidata[k,:] = phi.vec[:]
         agentsdata[k,:,:] = agents
 
         if vtkoutput and k % 10 == 0:
@@ -262,8 +264,8 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
     for k in range(len(times)):
         # Read data, backward in time (already reversed)
-        u.vec.FV()[:] = rhodata[k]
-        phi.vec.FV()[:] = phidata[k]
+        u.vec.FV().NumPy()[:] = rhodata[k,:]
+        phi.vec.FV().NumPy()[:] = phidata[k,:]
         agents = agentsdata[k,:,:]
 
         gcf = 0
@@ -382,15 +384,20 @@ plt.title('J')
 
 plt.show(block=False)
 
+pick = NgsPickler(open('circ_catch2.dat', 'wb'))
+
 k = 0
 with TaskManager():
     while True:
 
+        # import cProfile
+        # cProfile.run('HughesSolver(vels)', 'stats')
+        # input('lllllllllllllel')
         # Solve forward problem
         rhodata, phidata, agentsdata = HughesSolver(vels)
 
         # Solve backward problem (call with data already reversed in time)
-        nvels, Vs = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1,:,:], vels[::-1,:,:])
+        nvels, Vs = AdjointSolver(rhodata[::-1,:], phidata[::-1,:], agentsdata[::-1,:,:], vels[::-1,:,:])
 
         # Plot
         if mesh.dim == 1:
@@ -416,7 +423,7 @@ with TaskManager():
         print('Functional J_1 = ' + str(J1))
         J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
         J = J1 + J2
-        print('FunctionalJ = ' + str(J))
+        print('Functional J = ' + str(J))
 
         lJ1.set_xdata(list(range(k+1)))
         lJ2.set_xdata(list(range(k+1)))
@@ -427,5 +434,7 @@ with TaskManager():
         axJ.relim()
         axJ.autoscale_view()
         plt.pause(0.001)
+
+        pick.dump([rhodata, phidata, agentsdata, nvels, Vs, vels, J1, J2, J])
 
         k += 1
