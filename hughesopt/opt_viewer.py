@@ -13,7 +13,6 @@ import time
 #from geometries import *
 from ngsapps.utils import *
 from ngsapps.plotting import *
-from limiter import *
 from DGForms import *
 from rungekutta import *
 

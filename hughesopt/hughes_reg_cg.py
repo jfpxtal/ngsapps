@@ -16,7 +16,7 @@ import numpy as np
 
 #from geometries import *
 from ngsapps.plotting import *
-from limiter import *
+from ngsapps.limiter import *
 
 ngsglobals.msg_level = 0
 
@@ -281,9 +281,10 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         u.vec.data = invmat * rhs
         
-        if netgenMesh.dim == 1:
-            stabilityLimiter(u, fes, uplot)
-            nonnegativityLimiter(u, fes, uplot)
+        # doesn't make sense for H1
+        # if netgenMesh.dim == 1:
+        #     stabilityLimiter(u, fes)
+        #     nonnegativityLimiter(u, fes)
             
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
