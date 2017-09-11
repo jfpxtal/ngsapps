@@ -48,11 +48,11 @@ void ExportNgsAppsUtils(py::module &m)
   py::class_<AnnulusSpeedCoefficientFunction, PyAnnulusSpeedCF, CoefficientFunction>
     (m, "AnnulusSpeedCF", "")
     .def("__init__",
-         [](AnnulusSpeedCoefficientFunction *instance, double Rinner, double Router, double phi0, double vout, double v0)
+         [](AnnulusSpeedCoefficientFunction *instance, double Rinner, double Router, double phi0, double vout, double v0, double smearR, double smearphi)
          {
-           new (instance) AnnulusSpeedCoefficientFunction(Rinner, Router, phi0, vout, v0);
+           new (instance) AnnulusSpeedCoefficientFunction(Rinner, Router, phi0, vout, v0, smearR, smearphi);
          },
-         py::arg("Rinner"), py::arg("Router"), py::arg("phi0"), py::arg("vout"), py::arg("v0")
+         py::arg("Rinner"), py::arg("Router"), py::arg("phi0"), py::arg("vout"), py::arg("v0"), py::arg("smearR"), py::arg("smearphi")
       )
     .def("Dx", [](PyAnnulusSpeedCF & self) -> PyCF
          {

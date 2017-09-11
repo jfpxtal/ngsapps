@@ -32,8 +32,8 @@ gamma2 = 0
 
 # effective diffusion coefficent for W
 # ensures continuity of this field
-k = 0.06
-# k = 0
+# k = 0.06
+k = 2
 
 # self-advection
 w1 = 0
@@ -59,7 +59,7 @@ vmin = 0.001
 #                         IfPos(500-x, (vmin-v0)/100, 0))))
 
 # full profile, continuous
-smear = 10
+smear = 20
 v = IfPos(100-smear-x, v0,
           IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
             IfPos(200-x, vmin+(x/100-1)*(v0-vmin),

@@ -3,13 +3,16 @@ from netgen.geom2d import SplineGeometry, unit_square
 from ngsapps.utils import *
 import settings
 
+# FIXME: AnnulusSpeedCF Dx, Dy do not respect smear
+
 order = 3
 maxh = 7
 
 vtkoutput = False
 
 # time step and end
-tau = 0.01
+# tau = 0.01
+tau = 1
 tend = -1
 
 # diffusion coefficient for rho
@@ -34,8 +37,8 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-# mesh, v = settings.annulusInPeriodicSquare(order, maxh)
-mesh, v = settings.annulus(order, maxh)
+mesh, v = settings.annulusInPeriodicSquare(order, maxh)
+# mesh, v = settings.annulus(order, maxh)
 vdx = v.Dx()
 vdy = v.Dy()
 gradv = CoefficientFunction((vdx, vdy))
@@ -90,12 +93,12 @@ a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
 # a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
 
 # # equation for W
-# a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
-#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
-#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
-a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
-                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*gradWx*gradtWx - k*gradWy*gradtWy
+a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
+                 -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
+# a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
+#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*gradWx*gradtWx - k*gradWy*gradtWy
+#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
 
 m = BilinearForm(fes)
 m += SymbolicBFI(rho*trho + W*tW)
