@@ -12,7 +12,7 @@ vtkoutput = False
 
 # time step and end
 # tau = 0.01
-tau = 1
+tau = 0.5
 tend = -1
 
 # diffusion coefficient for rho
@@ -112,6 +112,7 @@ Draw(vdy, mesh, 'vdy')
 Draw(vdx, mesh, 'vdx')
 Draw(v, mesh, 'v')
 Draw(gW, mesh, 'W')
+Draw(vbar*gW-DT*grad(grho), mesh,'J')
 Draw(grho, mesh, 'rho')
 
 if vtkoutput:
