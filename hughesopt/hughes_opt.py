@@ -48,7 +48,7 @@ sigK = 2 # Sigma of exponential conv kernel
 width = 1 # width of conv kernel
 
 # Gradient descent
-otau = 1
+otau = 0.3
 
 eta = 5 # Penalty parameter
 
@@ -216,11 +216,7 @@ def HughesSolver(vels):
         if vtkoutput and k % 10 == 0:
             vtk.Do()
 
-        if mesh.dim == 1:
-            stabilityLimiter(u, p1fes)
-            nonnegativityLimiter(u, p1fes)
-        else:
-            Limit(u, 1, 0.1, maxh)
+        Limit(u, p1fes, 1, 0.1, maxh, True)
 
         if mesh.dim == 1:
             if (k+1) % plotmod == 0 or t == times[-1]:
@@ -296,20 +292,14 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         rhs.data += m.mat * lam1.vec
         lam1.vec.data = invmat * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam1, p1fes)
-        else:
-            Limit(lam1, 1, 0.1, maxh)
+        Limit(lam1, p1fes, 1, 0.1, maxh, False)
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
         rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam2, p1fes)
-        else:
-            Limit(lam2, 1, 0.1, maxh)
+        Limit(lam2, p1fes, 1, 0.1, maxh, False)
 
         # Integrate lam3-equation
         for i in range(Na):
@@ -392,7 +382,7 @@ maxk = 1e5
 graderr = 1e12
 Vopt = []
 with TaskManager():
-    while graderr > 1e-2 and k < maxk:
+    while graderr > 1e-5 and k < maxk:
 
         # Solve forward problem
         rhodata, phidata, agentsdata = HughesSolver(vels)

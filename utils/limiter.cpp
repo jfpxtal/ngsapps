@@ -87,6 +87,182 @@ void limit(shared_ptr<GridFunction> u, shared_ptr<FESpace> p1fes, double theta, 
   flags.SetFlag("novisual");
   auto p1gf = CreateGridFunction(p1fes, "gfu", flags);
   p1gf->Update();
+  project(u, p1gf);
+
+  IterateElements(*fes, VOL, glh, [&] (FESpace::Element el, LocalHeap &lh)
+    {
+      auto &trafo = el.GetTrafo();
+      const auto &fel = el.GetFE();
+      const auto &facets = el.Facets();
+      auto et = ElementTopology(el.GetType());
+      const auto &et_edges = ElementTopology::GetEdges(el.GetType());
+      const auto &et_verts = et.GetVertices();
+      auto nv = et.GetNVertices();
+
+      static ScalarFE<ET_SEGM,1> segm;
+      static ScalarFE<ET_TRIG,1> trig;
+      BaseScalarFiniteElement *p1fe;
+      if (el.GetType() == ET_SEGM)
+        p1fe = &segm;
+      else
+        p1fe = &trig;
+
+      FlatVector<> mid(ma->GetDimension(), lh);
+      mid = 1.0/nv;
+      auto &xT_mip = trafo(IntegrationPoint(mid, 0), lh);
+      auto xT = xT_mip.GetPoint();
+
+      FlatArray<BaseMappedIntegrationPoint*> fac_cents(facets.Size(), lh);
+      Array<BaseMappedIntegrationPoint*> other_cents;
+      for (int i : Range(facets))
+      {
+        auto fact = ElementTopology::GetFacetType(el.GetType(), i);
+        if (fact == ET_POINT)
+          fac_cents[i] = &trafo(IntegrationPoint(et_verts[i], 0), lh);
+        else // sure hope it's ET_SEGM
+        {
+          FlatVector<const double> v1(2, et_verts[et_edges[i][0]]);
+          FlatVector<const double> v2(2, et_verts[et_edges[i][1]]);
+          fac_cents[i] = &trafo(IntegrationPoint(0.5*(v1+v2) | lh, 0), lh);
+        }
+
+        Array<int> elnums;
+        ma->GetFacetElements(facets[i], elnums);
+
+        for (auto facel : elnums)
+        {
+          if (facel != el.Nr())
+          {
+            const auto &other_trafo = ma->GetTrafo(ElementId(facel), lh);
+            other_cents.Append(&other_trafo(IntegrationPoint(mid, 0), lh));
+          }
+        }
+      }
+
+      double uT = p1gf->Evaluate(xT_mip);
+      bool limited = false;
+      if (other_cents.Size() == facets.Size())
+      {
+        FlatVector<> uTi(other_cents.Size(), lh);
+        for (int i : Range(other_cents))
+          uTi[i] = p1gf->Evaluate(*other_cents[i]);
+
+        FlatVector<> delta(other_cents.Size(), lh);
+        for (int i : Range(other_cents))
+        {
+          FlatMatrix<> lmat(ma->GetDimension(), lh);
+          for (int j : Range(lmat.Width()))
+            lmat.Col(j) = other_cents[(i+j)%other_cents.Size()]->GetPoint() - xT;
+          CalcInverse(lmat);
+          FlatVector<> lam = lmat * (fac_cents[i]->GetPoint() - xT) | lh;
+
+          auto delta_u = 0.0;
+          for (int j : Range(ma->GetDimension()))
+            delta_u += lam[j]*(uTi[(i+j)%uTi.Size()]-uT);
+
+          auto orig_val = p1gf->Evaluate(*fac_cents[i]) - uT;
+          delta[i] = minmod_TVB(orig_val, theta*delta_u, M, h);
+          if (delta[i] != orig_val)
+            limited = true;
+        }
+
+        if (limited)
+        {
+          double neg_sum = 0, pos_sum = 0;
+          for (auto d : delta)
+          {
+            neg_sum += negPart(d);
+            pos_sum += posPart(d);
+          }
+
+          if (pos_sum - neg_sum != 0)
+          {
+            for (auto &del : delta)
+              del = min(1.0, neg_sum/pos_sum)*posPart(del) - min(1.0, pos_sum/neg_sum)*negPart(del);
+          }
+
+          for (auto &del : delta)
+            del += uT;
+
+          IntegrationRule ir(el.GetType(), 1+fel.Order());
+          auto &mir = trafo(ir, lh);
+
+          FlatMatrix<> lag_shape(p1fe->GetNDof(), ir.GetNIP(), lh);
+          IntegrationRule ir_facet(ir.GetNIP(), lh);
+          if (el.GetType() == ET_SEGM)
+            ir_facet = ir.Copy();
+          else // better be ET_TRIG
+          {
+            for (int i : Range(ir))
+            {
+              ir_facet[i].Point()[0] = 1-2*ir[i].Point()[1];
+              ir_facet[i].Point()[1] = 1-2*ir[i].Point()[0];
+            }
+          }
+          p1fe->CalcShape(ir_facet, lag_shape);
+          projectSingleEl(el, mir, lag_shape, delta, u, lh);
+        }
+      }
+
+      if (nonneg)
+      {
+        if (uT < 0)
+        {
+          cout << IM(2) << "Average is negative on el " << el.Nr() << ", setting to zero." << endl;
+          FlatVector<> zeros(fel.GetNDof(), lh);
+          zeros = 0;
+          u->SetElementVector(el.GetDofs(), zeros);
+          return;
+        }
+
+        IntegrationRule nnir(el.GetType(), fel.Order());
+        FlatVector<> nnvec(nnir.GetNIP(), lh);
+        u->Evaluate(trafo(nnir, lh), nnvec.AsMatrix(nnir.GetNIP(), 1));
+        auto negative = any_of(nnvec.begin(), nnvec.end(), (bool(*)(double))signbit);
+
+        if (negative)
+        {
+          FlatVector<> vvals(nv, lh);
+          if (limited)
+          {
+            for (int i : Range(nv))
+              vvals[i] = u->Evaluate(trafo(IntegrationPoint(FlatVector<>(ma->GetDimension(), (void*)et_verts[i]), 0), lh));
+          }
+          else
+          {
+            for (int i : Range(nv))
+              vvals[i] = p1gf->Evaluate(trafo(IntegrationPoint(FlatVector<>(ma->GetDimension(), (void*)et_verts[i]), 0), lh));
+          }
+          auto minval = *min_element(vvals.begin(), vvals.end());
+
+          if (minval == uT)
+            return; // all vals >= 0, because we already checked uT >= 0
+
+          double s = uT/(uT-minval);
+          for (auto &val : vvals)
+            val =  s*(val - uT) + uT;
+
+          IntegrationRule ir(el.GetType(), 1+fel.Order());
+          auto &mir = trafo(ir, lh);
+          FlatMatrix<> lag_shape(p1fe->GetNDof(), ir.GetNIP(), lh);
+          p1fe->CalcShape(ir, lag_shape);
+          projectSingleEl(el, mir, lag_shape, vvals, u, lh);
+
+        }
+      }
+
+    });
+}
+
+void limitold(shared_ptr<GridFunction> u, shared_ptr<FESpace> p1fes, double theta, double M, double h, bool nonneg)
+{
+  LocalHeap glh(100000, "limiter lh");
+  const auto fes = u->GetFESpace();
+  const auto ma = fes->GetMeshAccess();
+  Flags flags;
+  flags.SetFlag("novisual");
+  auto p1gf = CreateGridFunction(p1fes, "gfu", flags);
+  p1gf->Update();
   auto mass = make_shared<MassIntegrator<2>>(make_shared<ConstantCoefficientFunction>(1.0));
   // auto mass = GetIntegrators().CreateBFI('Mass', ma)
   CalcFluxProject(*u, *p1gf, mass, false, -1, glh);

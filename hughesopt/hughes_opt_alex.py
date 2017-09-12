@@ -13,7 +13,7 @@ import time
 #from geometries import *
 from ngsapps.utils import *
 from ngsapps.plotting import *
-from limiter import *
+from ngsapps.limiter import *
 from DGForms import *
 from rungekutta import *
 
@@ -50,8 +50,8 @@ otau = 0.6
 eta = 5 # Penalty parameter
 
 
-usegeo = "circle"
-# usegeo = "1d"
+# usegeo = "circle"
+usegeo = "1d"
 
 if usegeo == "circle":
     radius = 4
@@ -215,11 +215,7 @@ def HughesSolver(vels):
         if vtkoutput and k % 10 == 0:
             vtk.Do()
 
-        if mesh.dim == 1:
-            stabilityLimiter(u, p1fes)
-            nonnegativityLimiter(u, p1fes)
-        else:
-            Limit(u, 1, 0.1, maxh)
+        Limit(u, p1fes, 1, 0.1, maxh, True)
 
         if mesh.dim == 1:
             if (k+1) % plotmod == 0 or t == times[-1]:
@@ -295,20 +291,14 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         rhs.data += m.mat * lam1.vec
         lam1.vec.data = invmat * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam1, p1fes)
-        else:
-            Limit(lam1, 1, 0.1, maxh)
+        Limit(lam1, p1fes, 1, 0.1, maxh, False)
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
         rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam2, p1fes)
-        else:
-            Limit(lam2, 1, 0.1, maxh)
+        Limit(lam2, p1fes, 1, 0.1, maxh, False)
 
         # Integrate lam3-equation
         for i in range(Na):
@@ -384,57 +374,59 @@ plt.title('J')
 
 plt.show(block=False)
 
-pick = NgsPickler(open('circ_catch2.dat', 'wb'))
+# pick = NgsPickler(open('circ_catch2.dat', 'wb'))
 
-k = 0
-with TaskManager():
-    while True:
+def run(vels):
+    k = 0
+    with TaskManager():
+        while k < 5:
 
-        # import cProfile
-        # cProfile.run('HughesSolver(vels)', 'stats')
-        # input('lllllllllllllel')
-        # Solve forward problem
-        rhodata, phidata, agentsdata = HughesSolver(vels)
+            # Solve forward problem
+            rhodata, phidata, agentsdata = HughesSolver(vels)
 
-        # Solve backward problem (call with data already reversed in time)
-        nvels, Vs = AdjointSolver(rhodata[::-1,:], phidata[::-1,:], agentsdata[::-1,:,:], vels[::-1,:,:])
+            # Solve backward problem (call with data already reversed in time)
+            nvels, Vs = AdjointSolver(rhodata[::-1,:], phidata[::-1,:], agentsdata[::-1,:,:], vels[::-1,:,:])
 
-        # Plot
-        if mesh.dim == 1:
-            # Update agents plot
-            for i in range(Na):
-                line_x[i].set_ydata(agentsdata[:,i,0])
-            ax.relim()
-            ax.autoscale_view()
+            # Plot
+            if mesh.dim == 1:
+                # Update agents plot
+                for i in range(Na):
+                    line_x[i].set_ydata(agentsdata[:,i,0])
+                ax.relim()
+                ax.autoscale_view()
 
-        linev_x.set_ydata(Vs)
-        axv.relim()
-        axv.autoscale_view()
+            linev_x.set_ydata(Vs)
+            axv.relim()
+            axv.autoscale_view()
 
-        # Update velocities
-        vels -= otau*nvels
+            # Update velocities
+            vels -= otau*nvels
 
-        # Project to interval [-radius/tend, radius/tend]
-        vels = np.minimum(vels,0.5*radius/tend)
-        vels = np.maximum(vels,-0.5*radius/tend)
+            # Project to interval [-radius/tend, radius/tend]
+            vels = np.minimum(vels,0.5*radius/tend)
+            vels = np.maximum(vels,-0.5*radius/tend)
 
-        # Evaluate Functional
-        J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
-        print('Functional J_1 = ' + str(J1))
-        J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
-        J = J1 + J2
-        print('Functional J = ' + str(J))
+            # Evaluate Functional
+            J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
+            print('Functional J_1 = ' + str(J1))
+            J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
+            J = J1 + J2
+            print('Functional J = ' + str(J))
 
-        lJ1.set_xdata(list(range(k+1)))
-        lJ2.set_xdata(list(range(k+1)))
-        lJ.set_xdata(list(range(k+1)))
-        lJ1.set_ydata(np.hstack((lJ1.get_ydata(), J1)))
-        lJ2.set_ydata(np.hstack((lJ2.get_ydata(), J2)))
-        lJ.set_ydata(np.hstack((lJ.get_ydata(), J)))
-        axJ.relim()
-        axJ.autoscale_view()
-        plt.pause(0.001)
+            lJ1.set_xdata(list(range(k+1)))
+            lJ2.set_xdata(list(range(k+1)))
+            lJ.set_xdata(list(range(k+1)))
+            lJ1.set_ydata(np.hstack((lJ1.get_ydata(), J1)))
+            lJ2.set_ydata(np.hstack((lJ2.get_ydata(), J2)))
+            lJ.set_ydata(np.hstack((lJ.get_ydata(), J)))
+            axJ.relim()
+            axJ.autoscale_view()
+            plt.pause(0.001)
 
-        pick.dump([rhodata, phidata, agentsdata, nvels, Vs, vels, J1, J2, J])
+            # pick.dump([rhodata, phidata, agentsdata, nvels, Vs, vels, J1, J2, J])
 
-        k += 1
+            k += 1
+
+import cProfile
+cProfile.run('run(vels)', 'statsnew')
+input('done')
