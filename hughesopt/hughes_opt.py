@@ -48,8 +48,7 @@ sigK = 2 # Sigma of exponential conv kernel
 width = 1 # width of conv kernel
 
 # Gradient descent
-otau = 1
-
+otau = 0.6
 eta = 5 # Penalty parameter
 
 
@@ -69,12 +68,12 @@ if usegeo == "circle":
 
 elif usegeo == "1d":
     radius = 8
-    maxh = 0.1
+    maxh = 0.05
     netgenMesh = Make1DMesh(-radius, radius, maxh)
 
     # initial data
     xshift = 2
-    u_init = 0.8*exp(-(sqr(x-xshift)+y*y))
+    u_init = 0.8*exp(-(sqr(x-xshift)))
     phi_init = 5-abs(x)
     ag_init = [(1,)]
 
@@ -95,9 +94,9 @@ def K(agent):
 
 def Kprime(agent):
     if mesh.dim == 1:
-        return [2*sigK*K(agent)*(x-agent[0])]
+        return -2*sigK*K(agent)*(x-agent[0])
     else:
-        return 2*sigK*K(agent)*CoefficientFunction((x-agent[0], y-agent[1]))
+        return -2*sigK*K(agent)*CoefficientFunction((x-agent[0], y-agent[1]))
 
 # finite element space
 fes = L2(mesh, order=order, flags={'dgjumps': True})
@@ -193,12 +192,16 @@ def HughesSolver(vels):
     for k, t in enumerate(times):
         # Solve Eikonal equation using Newton
         feik.Assemble()
+#        start = time.clock()
         EikonalSolver()
+#        print("\r Eikonal took " + str(time.clock() - start), end='', flush=True)
 
         gcf = 0
         for ag in agents:
             gcf += K(ag)
         g.Set(gcf/Na)
+        
+        g.Set(0*x)
 
         # IMEX Time integration
         aupw.Apply(u.vec, rhs)
@@ -217,8 +220,10 @@ def HughesSolver(vels):
             vtk.Do()
 
         if mesh.dim == 1:
+#            start = time.clock()
             stabilityLimiter(u, p1fes)
             nonnegativityLimiter(u, p1fes)
+#            print("Limiter took " + str(time.clock() - start))
         else:
             Limit(u, 1, 0.1, maxh)
 
@@ -226,8 +231,9 @@ def HughesSolver(vels):
             if (k+1) % plotmod == 0 or t == times[-1]:
                 uplot.Redraw()
                 phiplot.Redraw()
-                gplot.Redraw()
+#                gplot.Redraw()
                 plt.pause(0.001)
+#                input("")
                 #print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
         else:
             Redraw(blocking=False)
@@ -236,7 +242,7 @@ def HughesSolver(vels):
 
 
 # Assemble forms for adjoint eq
-aupwadj = UpwindFormNonDivergence(fes, (f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-grad(g)), v, w, h, n)
+aupwadj = UpwindFormNonDivergence(fes, (f(u)*f(u) + 2*u*f(u)*fprime(u))*(grad(phi)-g), v, w, h, n)
 ## asip stays the same
 fadj = LinearForm(fes)
 fadj += SymbolicLFI(-2*fprime(u)*f(u)*lam2/(sqr(sqr(f(u))+del2))*w)
@@ -271,7 +277,7 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
         gcf = 0
         for ag in agents:
-            gcf += K(ag)
+            gcf += Kprime(ag)
         g.Set(gcf/Na)
 
         mass = Integrate(u, mesh)
@@ -317,16 +323,16 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
             for j, kp in enumerate(kprime):
                 g.Set(kp/Na)
                 upd = Integrate(u*sqr(f(u))*grad(g)*grad(lam1), mesh)
-                lam3[i,j] += tau*upd
+                lam3[i,j] -= tau*upd
                 nvels[k,i,j] += lam3[i,j]
 
-        if mesh.dim == 1:
-            if (k+1) % plotmod == 0 or k == len(times)-1:
-                lam1plot.Redraw()
-                lam2plot.Redraw()
-                plt.pause(0.001)
-        else:
-            Redraw(blocking=False)
+#        if mesh.dim == 1:
+#            if (k+1) % plotmod == 0 or k == len(times)-1:
+##                lam1plot.Redraw()
+##                lam2plot.Redraw()
+##                plt.pause(0.001)
+#        else:
+#            Redraw(blocking=False)
 
     return [nvels[::-1,:,:], Vs[::-1]]
 
@@ -335,27 +341,16 @@ if vtkoutput:
     vtk.Do()
 
 if mesh.dim == 1 and plotting:
-    plt.subplot(421)
+    plt.subplot(221)
     uplot = Plot(u, mesh=mesh)
     line_x, = plt.plot([0], [1], marker='o', markersize=3, color="red")
     plt.title('u')
-    plt.subplot(422)
+    plt.subplot(222)
     phiplot = Plot(phi, mesh=mesh)
     plt.title('phi')
- 
-    plt.subplot(423)
-    lam1plot = Plot(lam1, mesh=mesh)
-    plt.title('lam1')
-    plt.subplot(424)
-    lam2plot = Plot(lam2, mesh=mesh)
-    plt.title('lam2')
-
-    plt.subplot(413)
-    gplot = Plot(g, mesh=mesh)
-    plt.title('K')
 
     # Plot agent positions
-    plt.subplot(414)
+    plt.subplot(223)
     ax = plt.gca()
     line_x = []
     for i in range(Na):
@@ -380,25 +375,28 @@ if plotting:
     # Plot functional
     plt.subplot(212)
     axJ = plt.gca()
-    lJ1, = plt.plot([], [], 'r')
-    lJ2, = plt.plot([], [], 'g')
     lJ, = plt.plot([], [], 'b')
     plt.title('J')
     
     plt.show(block=False)
 
 k = 0
-maxk = 1e5
+maxk = 1
 graderr = 1e12
 Vopt = []
 with TaskManager():
-    while graderr > 1e-2 and k < maxk:
+    while graderr >  0.05 and k < maxk:
 
         # Solve forward problem
+        
+        start = time.clock()
         rhodata, phidata, agentsdata = HughesSolver(vels)
-
+        print("\n Hughes took " + str(time.clock() - start))
         # Solve backward problem (call with data already reversed in time)
+        
+        start = time.clock()
         nvels, Vs = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1,:,:], vels[::-1,:,:])
+        print("Adjoint took " + str(time.clock() - start))
 
         Vopt.append(Vs)
 
@@ -418,23 +416,22 @@ with TaskManager():
         # Update velocities
         vels -= otau*nvels
 
-        graderr = sqrt(tau*sum(np.multiply(nvels[0,:],nvels[0,:])))
+        graderr = 0
+        for i in range(Na):
+            graderr += sqrt(tau*sum(np.multiply(nvels[:,i,:],nvels[:,i,:])))
 
         # Project to interval [-radius/tend, radius/tend]
         #vels = np.minimum(vels,0.5*radius/tend)
         #vels = np.maximum(vels,-0.5*radius/tend)
-
         # Evaluate Functional
         J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
-        J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
+        J2 = 0
+        for i in range(Na):
+            J2 += alpha/(2*Na*tend)*tau*sum(np.multiply(vels[:,i,:],vels[:,i,:]))
         J = J1 + J2
 
         if plotting:
-            lJ1.set_xdata(list(range(k+1)))
-            lJ2.set_xdata(list(range(k+1)))
             lJ.set_xdata(list(range(k+1)))
-            lJ1.set_ydata(np.hstack((lJ1.get_ydata(), J1)))
-            lJ2.set_ydata(np.hstack((lJ2.get_ydata(), J2)))
             lJ.set_ydata(np.hstack((lJ.get_ydata(), J)))
             axJ.relim()
             axJ.autoscale_view()
@@ -448,19 +445,19 @@ with TaskManager():
 #feik.Assemble()
 #EikonalSolver()
 #[rhodata, phidata, agentsdata] = HughesSolver(vels)
-##
-pickler = pickle.Pickler(open ("veldata.dat", "wb"))
-pickler.dump (vels)
-del pickler
-
-pickler = pickle.Pickler(open ("variancedata.dat", "wb"))
-pickler.dump (Vopt)
-del pickler
-
-pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
-pickler.dump (agentsdata)
-del pickler
-pickler = pickle.Pickler(open ("rhodata.dat", "wb"))
+###
+#pickler = pickle.Pickler(open ("veldata.dat", "wb"))
+#pickler.dump (vels)
+#del pickler
+#
+#pickler = pickle.Pickler(open ("variancedata.dat", "wb"))
+#pickler.dump (Vopt)
+#del pickler
+#
+#pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
+#pickler.dump (agentsdata)
+#del pickler
+pickler = pickle.Pickler(open ("rhodata_nocontrol.dat", "wb"))
 pickler.dump (np.asarray(rhodata))
 del pickler
 
