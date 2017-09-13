@@ -30,43 +30,41 @@ ngsglobals.msg_level = 0
 plotmod = 1000
 
 order = 1
-maxh = 0.05
 tau = 0.01
 tend = 3 # 3.5
-times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
 vtkoutput = False
 
-del1 = 0.1 # Regularization parameters
+# Regularization parameters
+del1 = 0.1
 del2 = 0.1
 D = 0.05
+alpha = 0.01
 
-Na = 1 # Number of agents
-width = 1 # width of conv kernel
-alpha = 0.01 # Regularization parameter
 cK = 1 # Parameter to control strength of attraction
 sigK = 2 # Sigma of exponential conv kernel
-vels = 0.8*np.ones((Na,times.size)) # Position of agents
+width = 1 # width of conv kernel
+
+# Gradient descent
+otau = 0.6
 
 eta = 5 # Penalty parameter
 
 
-usegeo = "circle"
+# usegeo = "circle"
 usegeo = "1d"
-
-plotting = True
-
-radius = 8
 
 if usegeo == "circle":
     radius = 4
-    maxh = 0.25
+    maxh = 0.15
     geo = SplineGeometry()
     geo.AddCircle ( (0.0, 0.0), r=radius, bc="cyl")
     netgenMesh = geo.GenerateMesh(maxh=maxh)
 
-    u_init = 0.8*exp(-(sqr(x)+sqr(y)))
-    phi_init = 8-norm(x, y)
-    ag_init = [(1,1),(-1,-1)]
+    u_init = 0.8*exp(-(sqr(x+1)+0.2*sqr(y)))
+    # u_init += 0.8*exp(-(sqr(x+1)+sqr(y-1)))
+    # u_init += 0.8*exp(-(sqr(x)+sqr(y)))
+    phi_init = radius-norm(x, y)
+    ag_init = [(1,1),(1,-1)]
 
 elif usegeo == "1d":
     radius = 8
@@ -74,29 +72,29 @@ elif usegeo == "1d":
     netgenMesh = Make1DMesh(-radius, radius, maxh)
 
     # initial data
-    xshift = 2
-    u_init = 0.8*exp(-(sqr(x-xshift)+y*y))
-    phi_init = 5-abs(x)
-    ag_init = [(0,)]
+    u_init = 0.8*exp(-(sqr(x-3)))+0.8*exp(-(sqr(x-6)))
+    phi_init = radius-abs(x)
+    ag_init = [(3,)]
 
 mesh = Mesh(netgenMesh)
 
 Na = len(ag_init) # Number of agents
 
 times = np.linspace(0.0,tend,np.ceil(tend/tau)) # FIXME: make tend/tau integer
-vels = np.zeros((times.size, Na, mesh.dim)) # Inital velocity of agents
+# Inital velocity of agents
+vels = np.zeros((times.size, Na, mesh.dim))
 # vels = 0.8*np.ones((times.size, Na, mesh.dim))
 # vels = -0.5*np.ones((times.size, Na, mesh.dim))
 
 def K(agent):
     if mesh.dim == 1:
-        return cK*exp(-sigK*(sqr(x-agent)))
+        return cK*exp(-sigK*(sqr(x-agent[0])))
     else:
         return cK*exp(-sigK*(sqr(x-agent[0])+sqr(y-agent[1])))
 
 def Kprime(agent):
     if mesh.dim == 1:
-        return [2*sigK*K(agent)*(x-agent)]
+        return [2*sigK*K(agent)*(x-agent[0])]
     else:
         return 2*sigK*K(agent)*CoefficientFunction((x-agent[0], y-agent[1]))
 
@@ -115,8 +113,6 @@ phi = GridFunction(fes)
 lam1 = GridFunction(fes)
 lam2 = GridFunction(fes)
 
-tmp = GridFunction(fes)
-phi_rhs = GridFunction(fes)
 q = phi.vec.CreateVector()
 q2 = phi.vec.CreateVector()
 
@@ -186,12 +182,11 @@ invmat = mstar.Inverse(fes.FreeDofs())
 # Explicit Euler
 def HughesSolver(vels):
     # Initial data
-    mi = 1# Integrate(unitial, mesh)
-    u.Set(1/mi*u_init)
-    agents = np.array([1.0]) # Initial pos agents
-    phi.Set(5-abs(x))
-    rhodata = np.zeros([times.size, u.vec.size])
-    phidata = []
+    u.Set(u_init)
+    agents = ag_init[:]
+    phi.Set(phi_init)
+    rhodata = np.empty((len(times), u.vec.size))
+    phidata = np.empty_like(rhodata)
     agentsdata = np.empty_like(vels)
 
     for k, t in enumerate(times):
@@ -213,18 +208,14 @@ def HughesSolver(vels):
         # Update Agents positions (expl. Euler)
         agents += tau*vels[k,:,:]
 
-        rhodata[k,:]= u.vec.FV().NumPy()[:]
-        phidata.append(phi.vec.FV()[:])
+        rhodata[k,:] = u.vec[:]
+        phidata[k,:] = phi.vec[:]
         agentsdata[k,:,:] = agents
 
         if vtkoutput and k % 10 == 0:
             vtk.Do()
 
-        if mesh.dim == 1:
-            stabilityLimiter(u, p1fes)
-            nonnegativityLimiter(u, p1fes)
-        else:
-            Limit(u, 1, 0.1, maxh)
+        Limit(u, p1fes, 1, 0.1, maxh, True)
 
         if mesh.dim == 1:
             if (k+1) % plotmod == 0 or t == times[-1]:
@@ -232,7 +223,7 @@ def HughesSolver(vels):
                 phiplot.Redraw()
                 gplot.Redraw()
                 plt.pause(0.001)
-                #print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)))
+                print('Hughes @ t = ' + str(t) + ', mass = ' + str(Integrate(u,mesh)) + '\n')
         else:
             Redraw(blocking=False)
 
@@ -269,8 +260,8 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
 
     for k in range(len(times)):
         # Read data, backward in time (already reversed)
-        u.vec.FV().NumPy()[:] = rhodata[k]
-        phi.vec.FV()[:] = phidata[k]
+        u.vec.FV().NumPy()[:] = rhodata[k,:]
+        phi.vec.FV().NumPy()[:] = phidata[k,:]
         agents = agentsdata[k,:,:]
 
         gcf = 0
@@ -300,20 +291,14 @@ def AdjointSolver(rhodata, phidata, agentsdata, vels):
         rhs.data += m.mat * lam1.vec
         lam1.vec.data = invmat * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam1, p1fes)
-        else:
-            Limit(lam1, 1, 0.1, maxh)
+        Limit(lam1, p1fes, 1, 0.1, maxh, False)
 
         # IMEX for lam2-Eq
         aupwadj2.Apply(lam2.vec,rhs)
         rhs.data += fadj2.vec
         lam2.vec.data = invmat2 * rhs
 
-        if mesh.dim == 1:
-            stabilityLimiter(lam2, p1fes)
-        else:
-            Limit(lam2, 1, 0.1, maxh)
+        Limit(lam2, p1fes, 1, 0.1, maxh, False)
 
         # Integrate lam3-equation
         for i in range(Na):
@@ -338,10 +323,9 @@ if vtkoutput:
     vtk = MyVTKOutput(ma=mesh,coefs=[u, phi],names=["rho","phi"],filename="vtk/rho",subdivision=1)
     vtk.Do()
 
-if mesh.dim == 1 and plotting:
+if mesh.dim == 1:
     plt.subplot(421)
     uplot = Plot(u, mesh=mesh)
-    line_x, = plt.plot([0], [1], marker='o', markersize=3, color="red")
     plt.title('u')
     plt.subplot(422)
     phiplot = Plot(phi, mesh=mesh)
@@ -366,73 +350,69 @@ if mesh.dim == 1 and plotting:
         line_x.append(ax.plot(times,times)[0])
     plt.title('Position agent')
 
-elif plotting:
+else:
     Draw(lam1, mesh, 'lam1')
     Draw(lam2, mesh, 'lam2')
     Draw(g, mesh, 'g')
     Draw(phi, mesh, 'phi')
     Draw(u, mesh, 'u')
 
-if plotting:
-    # Plot variance
-    plt.figure()
-    plt.subplot(211)
-    axv = plt.gca()
-    linev_x, = axv.plot(times,times)
-    plt.title('Variance')
-    
-    # Plot functional
-    plt.subplot(212)
-    axJ = plt.gca()
-    lJ1, = plt.plot([], [], 'r')
-    lJ2, = plt.plot([], [], 'g')
-    lJ, = plt.plot([], [], 'b')
-    plt.title('J')
-    
-    plt.show(block=False)
+# Plot variance
+plt.figure()
+plt.subplot(211)
+axv = plt.gca()
+linev_x, = axv.plot(times,times)
+plt.title('Variance')
 
-k = 0
-with TaskManager():
-    while True:
+# Plot functional
+plt.subplot(212)
+axJ = plt.gca()
+lJ1, = plt.plot([], [], 'r')
+lJ2, = plt.plot([], [], 'g')
+lJ, = plt.plot([], [], 'b')
+plt.title('J')
 
-        # Solve forward problem
-        rhodata, phidata, agentsdata = HughesSolver(vels)
+plt.show(block=False)
 
-        # Solve backward problem (call with data already reversed in time)
-        nvels, Vs = AdjointSolver(rhodata[::-1], phidata[::-1], agentsdata[::-1,:,:], vels[::-1,:,:])
+# pick = NgsPickler(open('circ_catch2.dat', 'wb'))
 
-        Vopt.append(Vs)
+def run(vels):
+    k = 0
+    with TaskManager():
+        while k < 5:
 
-        # print(Vs)
-        # Plot
-        if mesh.dim == 1 and plotting:
-            # Update agents plot
-            for i in range(Na):
-                line_x[i].set_ydata(agentsdata[:,i,0])
-            ax.relim()
-            ax.autoscale_view()
+            # Solve forward problem
+            rhodata, phidata, agentsdata = HughesSolver(vels)
+
+            # Solve backward problem (call with data already reversed in time)
+            nvels, Vs = AdjointSolver(rhodata[::-1,:], phidata[::-1,:], agentsdata[::-1,:,:], vels[::-1,:,:])
+
+            # Plot
+            if mesh.dim == 1:
+                # Update agents plot
+                for i in range(Na):
+                    line_x[i].set_ydata(agentsdata[:,i,0])
+                ax.relim()
+                ax.autoscale_view()
 
             linev_x.set_ydata(Vs)
             axv.relim()
             axv.autoscale_view()
 
-        # Update velocities
-        vels -= otau*nvels
+            # Update velocities
+            vels -= otau*nvels
 
-        graderr = sqrt(tau*sum(np.multiply(nvels[0,:],nvels[0,:])))
+            # Project to interval [-radius/tend, radius/tend]
+            vels = np.minimum(vels,0.5*radius/tend)
+            vels = np.maximum(vels,-0.5*radius/tend)
 
-        # Project to interval [-radius/tend, radius/tend]
-        #vels = np.minimum(vels,0.5*radius/tend)
-        #vels = np.maximum(vels,-0.5*radius/tend)
+            # Evaluate Functional
+            J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
+            print('Functional J_1 = ' + str(J1))
+            J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
+            J = J1 + J2
+            print('Functional J = ' + str(J))
 
-        # Evaluate Functional
-        J1 = tau/(2*tend)*np.vdot(Vs,Vs)  # 1/T int_0^T |Vs|^2
-        print('Functional J_1 = ' + str(J1))
-        J2 = alpha/(2*Na*tend)*np.vdot(vels, vels)
-        J = J1 + J2
-        print('FunctionalJ = ' + str(J))
-
-        if plotting:
             lJ1.set_xdata(list(range(k+1)))
             lJ2.set_xdata(list(range(k+1)))
             lJ.set_xdata(list(range(k+1)))
@@ -443,53 +423,10 @@ with TaskManager():
             axJ.autoscale_view()
             plt.pause(0.001)
 
-        print('Functional J = ' + str(J) + ' Gradient = ' + str(graderr) + '\n')
-    #    input("press key")
-        #print(agentsdata)
+            # pick.dump([rhodata, phidata, agentsdata, nvels, Vs, vels, J1, J2, J])
 
-#feik.Assemble()
-#EikonalSolver()
-#[rhodata, phidata, agentsdata] = HughesSolver(vels)
-##
-pickler = pickle.Pickler(open ("veldata.dat", "wb"))
-pickler.dump (vels)
-del pickler
+            k += 1
 
-pickler = pickle.Pickler(open ("variancedata.dat", "wb"))
-pickler.dump (Vopt)
-del pickler
-
-pickler = pickle.Pickler(open ("agentsdata.dat", "wb"))
-pickler.dump (agentsdata)
-del pickler
-
-pickler = pickle.Pickler(open ("rhodata_nocontrol.dat", "wb"))
-pickler.dump (rhodata)
-del pickler
-
-pickler = pickle.Pickler(open ("Jdata.dat", "wb"))
-pickler.dump (Jopt)
-del pickler
-
-
-#unpickler = pickle.Unpickler(open ("rhodata.dat", "rb"))
-#urh = unpickler.load()
-#del unpickler
-
-
-#pickler = NgsPickler(open ("agentsdata.dat", "wb"))
-#pickler.dump (agentsdata)
-#del pickler
-
-#
-
-#unpickler = NgsUnpickler(open ("rhodata.dat", "rb"))
-#rhodata = unpickler.load()
-#del unpickler
-#unpickler = NgsUnpickler(open ("phidata.dat", "rb"))
-#phidata = unpickler.load()
-#del unpickler
-#unpickler = NgsUnpickler(open ("agentsdata.dat", "rb"))
-#agentsdata = unpickler.load()
-#del unpickler
-#
+import cProfile
+cProfile.run('run(vels)', 'statsnew')
+input('done')

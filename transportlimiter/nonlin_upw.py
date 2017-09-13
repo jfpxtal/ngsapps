@@ -19,15 +19,15 @@ from rungekutta import *
 
 ngsglobals.msg_level = 1
 
-maxh = 0.01
+# maxh = 0.01
 tau = 0.001
 order = 3
-# maxh = 0.02
+maxh = 0.02
 # tau = 0.001
 tend = -1
 
 usegeo = "square"
-usegeo = "1d"
+# usegeo = "1d"
 
 if usegeo == "circle":
     geo = SplineGeometry()
@@ -153,8 +153,8 @@ rhs = u.vec.CreateVector()
 rhs2 = u.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-u.Set(0.9*exp(-2*(x*x+y*y)))
-# u.Set(0.9*exp(-10*(sqr(x-0.5)+sqr(y-0.5))))
+# u.Set(0.9*exp(-2*(x*x+y*y)))
+u.Set(0.9*exp(-10*(sqr(x-0.5)+sqr(y-0.5))))
 uc.Set(0.5+0*x)
 # u.Set(CoefficientFunction(0.4))
 
@@ -202,9 +202,10 @@ with TaskManager():
         # invmat = mstar.Inverse(fes.FreeDofs())
         # u.vec.data = invmat * rhs
 
-        stabilityLimiter(u, fes)
-        nonnegativityLimiter(u, fes)
-        # Limit(u, p1fes, 1, 1, maxh, True)
+        # stabilityLimiter(u, fes)
+        # nonnegativityLimiter(u, fes)
+        Limit(u, p1fes, 1, 1, maxh, False)
+        # LimitOld(u, p1fes, 1, 1, maxh, True)
 
         # Calculate mass
         print('mass = ' + str(Integrate(u,mesh)))
