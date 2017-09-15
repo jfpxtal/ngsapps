@@ -162,6 +162,36 @@ def EikonalSolver():
         errNewton = q.Norm()
     #print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
 
+def UnregEikonal1D():
+    ir = IntegrationRule(ET.SEGM, 2*order)
+    vals = []
+    lastp = -radius
+    lastv = 0
+    unsorts = []
+    for el in fes.Elements():
+        trafo = el.GetTrafo()
+        mips = np.array([trafo(ip) for ip in ir])
+        points = [mip.point[0] for mip in mips]
+        sort = np.argsort(points)
+        unsort = np.empty_like(sort)
+        unsort[sort] = np.arange(len(sort))
+        unsorts.append(unsort)
+        for mip in mips[sort]:
+            lastv = 1/sqrt(f(u(mip))**2+del2)
+            vals.append((mip.point[0]-lastp) * lastv) # same point twice (L2)?
+            lastp = mip.point[0]
+
+    left = np.cumsum(vals)
+    right = np.cumsum([(radius-lastp)*lastv]+vals[:0:-1])[::-1]
+    nip = len(unsorts[0])
+    for i in range(len(unsorts)):
+        for j, idx in enumerate(unsorts[i]):
+            vals[i*nip+j] = min(left[i*nip+idx], right[i*nip+idx])
+
+    ipcf = CreateIPCF(len(unsorts), nip, vals)
+    phi.Set(ipcf)
+
+
 # Forms for Hughes Model diff-transport eq
 
 aupw = BilinearForm(fes)
@@ -190,9 +220,12 @@ def HughesSolver(vels):
     agentsdata = np.empty_like(vels)
 
     for k, t in enumerate(times):
-        # Solve Eikonal equation using Newton
-        feik.Assemble()
-        EikonalSolver()
+        # # Solve Eikonal equation using Newton
+        # feik.Assemble()
+        # EikonalSolver()
+
+        # UnregEikonal1D()
+        SolveEikonal1D(1/sqrt(sqr(f(u))+del2), phi)
 
         gcf = 0
         for ag in agents:
@@ -215,7 +248,7 @@ def HughesSolver(vels):
         if vtkoutput and k % 10 == 0:
             vtk.Do()
 
-        Limit(u, p1fes, 1, 0.1, maxh, True)
+        Limit(u, p1fes, 1, 1, maxh, True)
 
         if mesh.dim == 1:
             if (k+1) % plotmod == 0 or t == times[-1]:
@@ -379,7 +412,7 @@ plt.show(block=False)
 def run(vels):
     k = 0
     with TaskManager():
-        while k < 5:
+        while k < 10:
 
             # Solve forward problem
             rhodata, phidata, agentsdata = HughesSolver(vels)

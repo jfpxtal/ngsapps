@@ -10,6 +10,7 @@ add_ngsolve_python_module(libngsapps_utils
   annulusspeedcf.hpp annulusspeedcf.cpp
   utils.hpp utils.cpp
   limiter.hpp limiter.cpp
+  eikonal.hpp eikonal.cpp
   )
 
 install(TARGETS libngsapps_utils DESTINATION .)

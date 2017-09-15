@@ -10,6 +10,7 @@
 #include "zlogzcf.hpp"
 #include "annulusspeedcf.hpp"
 #include "limiter.hpp"
+#include "eikonal.hpp"
 
 using namespace ngfem;
 
@@ -207,6 +208,18 @@ void ExportNgsAppsUtils(py::module &m)
   m.def("Project", &project);
   m.def("Limit", &limit);
   m.def("LimitOld", &limitold);
+  m.def("CreateIPCF", [] (int elems, int size, vector<double> &vals) -> PyCF
+        {
+          auto res = make_shared<IntegrationPointCoefficientFunction>(elems, size);
+          for (auto e : Range(elems))
+          {
+            for (auto i : Range(size))
+              (*res)(e, i) = vals[e*size+i];
+          }
+          // return static_pointer_cast<CoefficientFunction>(res);
+          return res;
+        });
+  m.def("SolveEikonal1D", &solveEikonal1D);
 }
 
 PYBIND11_PLUGIN(libngsapps_utils)
