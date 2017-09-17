@@ -220,6 +220,16 @@ void ExportNgsAppsUtils(py::module &m)
           return res;
         });
   m.def("SolveEikonal1D", &solveEikonal1D);
+  py::class_<EikonalSolver2D, shared_ptr<EikonalSolver2D>>
+    (m, "EikonalSolver2D", "")
+    .def("__init__", [] (EikonalSolver2D *instance, shared_ptr<FESpace> fes, py::list refs)
+                  {
+                    vector<Vec<2>> nrefs;
+                    for (auto r : refs) nrefs.emplace_back(r.cast<py::tuple>()[0].cast<double>(), r.cast<py::tuple>()[1].cast<double>());
+                    new (instance) EikonalSolver2D(fes, nrefs);
+                  })
+    .def("Solve", &EikonalSolver2D::solve)
+    .def("GetSolutionGF", &EikonalSolver2D::getSolutionGF);
 }
 
 PYBIND11_PLUGIN(libngsapps_utils)
