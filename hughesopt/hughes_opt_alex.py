@@ -163,8 +163,8 @@ def EikonalSolver():
     #print('Newton finished with Res error = ' + str(q.Norm()) + ' after ' + str(k) + 'steps \n') # L2norm of update
 
 # Forms for Hughes Model diff-transport eq
-eiksolver = EikonalSolver2D(fes, [(-1,-1), (1,-1), (1,1), (-1,1)])
-phi2 = eiksolver.GetSolutionGF()
+eiksolver = EikonalSolver2D(fes, [(-radius,-radius), (radius,-radius), (radius,radius), (-radius,radius)])
+phi = eiksolver.GetSolutionGF()
 
 aupw = BilinearForm(fes)
 beta = grad(phi)-grad(g)
@@ -186,15 +186,15 @@ def HughesSolver(vels):
     # Initial data
     u.Set(u_init)
     agents = ag_init[:]
-    phi.Set(phi_init)
+    # phi.Set(phi_init)
     rhodata = np.empty((len(times), u.vec.size))
     phidata = np.empty((len(times), phi.vec.size))
     agentsdata = np.empty_like(vels)
 
     for k, t in enumerate(times):
         # # Solve Eikonal equation using Newton
-        feik.Assemble()
-        EikonalSolver()
+        # feik.Assemble()
+        # EikonalSolver()
 
         # UnregEikonal1D()
         # SolveEikonal1D(1/sqrt(sqr(f(u))+del2), phi)
@@ -362,7 +362,7 @@ else:
     Draw(lam2, mesh, 'lam2')
     Draw(g, mesh, 'g')
     Draw(phi, mesh, 'phi')
-    Draw(phi2, mesh, 'phi2')
+    # Draw(phi2, mesh, 'phi2')
     Draw(u, mesh, 'u')
 
 # Plot variance
@@ -387,7 +387,7 @@ plt.show(block=False)
 def run(vels):
     k = 0
     with TaskManager():
-        while k < 1:
+        while k < 1000:
 
             # Solve forward problem
             rhodata, phidata, agentsdata = HughesSolver(vels)
@@ -435,6 +435,7 @@ def run(vels):
 
             k += 1
 
-import cProfile
-cProfile.run('run(vels)', 'statsnew')
-input('done')
+# import cProfile
+# cProfile.run('run(vels)', 'statsnew')
+# input('done')
+run(vels)

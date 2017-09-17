@@ -7,6 +7,7 @@ class EikonalSolver2D
   typedef vector<pair<int, double>> DistByPnt;
   shared_ptr<ngcomp::MeshAccess> ma;
   vector<DistByPnt> distByPntByRef;
+  vector<array<double, 3>> anglesByEl;
   shared_ptr<ngcomp::FESpace> nodal_fes;
   shared_ptr<ngcomp::GridFunction> nodal_gf;
 

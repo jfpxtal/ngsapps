@@ -48,7 +48,7 @@ void solveEikonal1D(shared_ptr<CoefficientFunction> rhs, shared_ptr<GridFunction
 }
 
 EikonalSolver2D::EikonalSolver2D(shared_ptr<FESpace> fes, const vector<Vec<2>> &refs)
-  : ma(fes->GetMeshAccess()), distByPntByRef(refs.size())
+  : ma(fes->GetMeshAccess()), distByPntByRef(refs.size()), anglesByEl(ma->GetNE())
 {
   LocalHeap glh(10000, "eikonal 2d lh");
   IterateElements(*fes, VOL, glh, [&] (FESpace::Element el, LocalHeap &lh)
@@ -67,6 +67,7 @@ EikonalSolver2D::EikonalSolver2D(shared_ptr<FESpace> fes, const vector<Vec<2>> &
         if (angle < 0) angle += 2*M_PI;
         if (angle > M_PI/2)
           cout << "Warning (EikonalSolver2D): Element " << el.Nr() << " has obtuse angle." << endl;
+        anglesByEl[el.Nr()][i] = angle;
       }
   // }
     });
@@ -79,11 +80,8 @@ EikonalSolver2D::EikonalSolver2D(shared_ptr<FESpace> fes, const vector<Vec<2>> &
     //   cout << distByPntByRef[i][j].first << " " << distByPntByRef[i][j].second << endl;
   }
 
-  Flags flags;
-  flags.SetFlag("order", 1);
-  flags.SetFlag("novisual");
-  nodal_fes = CreateFESpace("nodal", ma, flags);
-  nodal_gf = CreateGridFunction(nodal_fes, "Eikonal", Flags());
+  nodal_fes = CreateFESpace("nodal", ma, Flags().SetFlag("order", 1));
+  nodal_gf = CreateGridFunction(nodal_fes, "Eikonal", Flags().SetFlag("novisual"));
   nodal_gf->Update();
 }
 
@@ -146,13 +144,10 @@ void EikonalSolver2D::solve(shared_ptr<CoefficientFunction> rhs)
             Vec<2> vert_cs[3];
             for (int i : Range(3)) vert_cs[i] = ma->GetPoint<2>(verts[i]);
             double lengths[3];
-            double angles[3];
             for (int i : Range(3))
             {
               Vec<2> e1 = vert_cs[(i+1)%3]-vert_cs[i];
               Vec<2> e2 = vert_cs[(i+2)%3]-vert_cs[i];
-              angles[i] = atan2(e2[1], e2[0])-atan2(e1[1], e1[0]);
-              if (angles[i] < 0) angles[i] += 2*M_PI;
               lengths[i] = L2Norm(e1);
             }
             Array<int> sort_idxs(3, glh);
@@ -173,8 +168,8 @@ void EikonalSolver2D::solve(shared_ptr<CoefficientFunction> rhs)
             const auto &a = lengths[(sort_idxs[0]+1)%3];
             const auto &b = lengths[(sort_idxs[1]+1)%3];
             const auto &c = lengths[(C_idx+1)%3];
-            const auto &alpha = angles[sort_idxs[0]];
-            const auto &beta = angles[sort_idxs[1]];
+            const auto &alpha = anglesByEl[el.Nr()][sort_idxs[0]];
+            const auto &beta = anglesByEl[el.Nr()][sort_idxs[1]];
             const auto &T_A = res[verts[sort_idxs[0]]];
             const auto &T_B = res[verts[sort_idxs[1]]];
             const auto &f_C = rhsvals[this_vert];
@@ -196,6 +191,12 @@ void EikonalSolver2D::solve(shared_ptr<CoefficientFunction> rhs)
               T_C = min({T_C, T_A+b*f_C, T_B+a*f_C});
             }
             if (abs(T_C-T_C_old)>1e-5) again = true;
+
+            // nodal_gf->SetElementVector(Array<int>({this_vert}), Vector<double>({T_C}));
+            // Ng_Redraw();
+            // cout << "done " << this_vert << endl;
+            // cin.ignore();
+
           } // for element
         } // for vertex
         if (!again) break;
