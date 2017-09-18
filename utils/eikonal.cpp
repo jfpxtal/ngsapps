@@ -52,7 +52,7 @@ EikonalSolver2D::EikonalSolver2D(shared_ptr<FESpace> fes, const vector<Vec<2>> &
 {
   LocalHeap glh(10000, "eikonal 2d lh");
   IterateElements(*fes, VOL, glh, [&] (FESpace::Element el, LocalHeap &lh)
-  // for (auto i : Range(ma->GetNE()))
+  // for (const auto &el : ma->Elements())
     {
       if (el.GetType() != ET_TRIG)
         throw Exception("EikonalSolver2D cannot handle non-trig elements.");
@@ -99,15 +99,18 @@ void EikonalSolver2D::solve(shared_ptr<CoefficientFunction> rhs)
   const auto &et_verts = ElementTopology::GetVertices(ET_TRIG);
   IntegrationRule ir(3, glh);
   for (auto i : Range(3)) ir[i] = IntegrationPoint(et_verts[i], 0);
-  ma->IterateElements(VOL, glh, [&] (Ngs_Element el, LocalHeap &lh)
+  // ma->IterateElements(VOL, glh, [&] (Ngs_Element el, LocalHeap &lh)
+  for (auto &&el : ma->Elements())
     {
+      HeapReset hr(glh);
       const auto &verts = el.Vertices();
-      const auto &trafo = ma->GetTrafo(el, lh);
-      const auto &mir = trafo(ir, lh);
-      FlatVector<> vals(3, lh);
+      const auto &trafo = ma->GetTrafo(el, glh);
+      const auto &mir = trafo(ir, glh);
+      FlatVector<> vals(3, glh);
       rhs->Evaluate(mir, vals.AsMatrix(ir.Size(), 1));
       for (auto i : Range(3)) rhsvals[verts[i]] += vals[i];
-    });
+    }
+    // });
 
   for (auto i : Range(rhsvals.size()))
   {

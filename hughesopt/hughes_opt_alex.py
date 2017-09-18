@@ -215,8 +215,8 @@ def HughesSolver(vels):
         # Update Agents positions (expl. Euler)
         agents += tau*vels[k,:,:]
 
-        rhodata[k,:] = u.vec[:]
-        phidata[k,:] = phi.vec[:]
+        rhodata[k,:] = u.vec.FV()
+        phidata[k,:] = phi.vec.FV()
         agentsdata[k,:,:] = agents
 
         if vtkoutput and k % 10 == 0:
@@ -387,7 +387,7 @@ plt.show(block=False)
 def run(vels):
     k = 0
     with TaskManager():
-        while k < 1000:
+        while True:
 
             # Solve forward problem
             rhodata, phidata, agentsdata = HughesSolver(vels)
