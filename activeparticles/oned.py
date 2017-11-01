@@ -6,7 +6,7 @@ import numpy as np
 from ngsapps.plotting import *
 from ngsapps.limiter import *
 
-order = 1
+order = 3
 maxh = 1
 
 vtkoutput = False
@@ -33,7 +33,7 @@ gamma2 = 0
 # effective diffusion coefficent for W
 # ensures continuity of this field
 # k = 0.06
-k = 2
+k = 0.5
 
 # self-advection
 w1 = 0
@@ -41,8 +41,33 @@ w1 = 0
 w2 = 10
 # w2 = 0
 
-mesh = Mesh(Make1DMesh(0, 600, maxh, True))
-# mesh = Mesh(Make1DMesh(-50, 300, 0.2, True))
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# diffusion coefficient for rho
+DT = 0.004
+
+# determines how quickly the average local swim speed
+# decreases with the density
+alpha = 0.38
+
+# positive parameters which ensure that, at steady state
+# and in the absence of any density or velocity gradients,
+# W vanishes everywhere
+gamma1 = 0.1
+gamma2 = 0.5
+
+# effective diffusion coefficent for W
+# ensures continuity of this field
+# k = 0.1
+k = 2
+
+# self-advection
+w1 = 0
+# active pressure, >0
+w2 = 30
+
+# mesh = Mesh(Make1DMesh(0, 600, maxh, True))
+mesh = Mesh(Make1DMesh(0, 300, 0.2, True))
 
 v0 = 0.2
 vmin = 0.001
@@ -59,20 +84,20 @@ vmin = 0.001
 #                         IfPos(500-x, (vmin-v0)/100, 0))))
 
 # full profile, continuous
-smear = 20
-v = IfPos(100-smear-x, v0,
-          IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
-            IfPos(200-x, vmin+(x/100-1)*(v0-vmin),
-                IfPos(400-x, v0,
-                        IfPos(500-x, v0+(x/100-4)*(vmin-v0),
-                              IfPos(500+smear-x, vmin+(x-500)/smear*(v0-vmin), v0))))))
+# smear = 10
+# v = IfPos(100-smear-x, v0,
+#           IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
+#             IfPos(200-x, vmin+(x/100-1)*(v0-vmin),
+#                 IfPos(400-x, v0,
+#                         IfPos(500-x, v0+(x/100-4)*(vmin-v0),
+#                               IfPos(500+smear-x, vmin+(x-500)/smear*(v0-vmin), v0))))))
 
-vdx = IfPos(100-smear-x, 0,
-          IfPos(100-x, (vmin-v0)/smear,
-            IfPos(200-x, (v0-vmin)/100,
-                IfPos(400-x, 0,
-                        IfPos(500-x, (vmin-v0)/100,
-                              IfPos(500+smear-x, (v0-vmin)/smear, 0))))))
+# vdx = IfPos(100-smear-x, 0,
+#           IfPos(100-x, (vmin-v0)/smear,
+#             IfPos(200-x, (v0-vmin)/100,
+#                 IfPos(400-x, 0,
+#                         IfPos(500-x, (vmin-v0)/100,
+#                               IfPos(500+smear-x, (v0-vmin)/smear, 0))))))
 
 # single sawtooth, discontinuous
 # v = IfPos(100-x, v0,
@@ -81,15 +106,15 @@ vdx = IfPos(100-smear-x, 0,
 # vdx = IfPos(100-x, 0,
 #             IfPos(200-x, (v0-vmin)/100, 0))
 
-# # single sawtooth, continuous
-# smear = 10
-# v = IfPos(100-smear-x, v0,
-#             IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
-#                 IfPos(200-x, vmin+(x-100)/100*(v0-vmin), v0)))
+# single sawtooth, continuous
+smear = 10
+v = IfPos(100-smear-x, v0,
+            IfPos(100-x, v0+(x-100+smear)/smear*(vmin-v0),
+                IfPos(200-x, vmin+(x-100)/100*(v0-vmin), v0)))
 
-# vdx = IfPos(100-smear-x, 0,
-#             IfPos(100-x, (vmin-v0)/smear,
-#                 IfPos(200-x, (v0-vmin)/100, 0)))
+vdx = IfPos(100-smear-x, 0,
+            IfPos(100-x, (vmin-v0)/smear,
+                IfPos(200-x, (v0-vmin)/100, 0)))
 
 fesRho = Periodic(H1(mesh, order=order))
 fesW = Periodic(H1(mesh, order=order-1))
@@ -141,9 +166,16 @@ mstar = m.mat.CreateMatrix()
 
 mplmesh = MPLMesh1D(mesh)
 mplmesh.Plot(v/v0)
-lineRho = mplmesh.Plot(grho)
+rhomass = Parameter(Integrate(grho, mesh))
+rhoplt = grho / rhomass
+lineRho = mplmesh.Plot(rhoplt)
 plt.figure()
-lineW = mplmesh.Plot(gW/grho)
+lineP = mplmesh.Plot(gW/grho, label='P')
+plt.legend()
+plt.figure()
+lineJ = mplmesh.Plot(vbar*gW-DT*grad(grho), label='J')
+# lineJ = mplmesh.Plot(grad(grho), label='J')
+plt.legend()
 plt.show(block=False)
 
 if vtkoutput:
@@ -171,10 +203,12 @@ with TaskManager():
         # nonnegativityLimiter(grho, p1fes)
 
         if k % 20 == 0:
+            rhomass.Set(0.01*Integrate(grho, mesh))
             lineRho.Redraw()
-            lineW.Redraw()
-            plt.gca().relim()
-            plt.gca().autoscale_view()
+            lineP.Redraw()
+            lineJ.Redraw()
+            # plt.gca().relim()
+            # plt.gca().autoscale_view()
             # plt.gcf().canvas.draw()
             plt.pause(0.05)
 

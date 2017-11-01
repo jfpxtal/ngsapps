@@ -3,6 +3,9 @@ from netgen.geom2d import SplineGeometry, unit_square
 from ngsapps.utils import *
 import settings
 import pickle
+from datetime import datetime
+
+ngsglobals.msg_level = 1
 
 # FIXME: AnnulusSpeedCF Dx, Dy do not respect smear
 
@@ -40,9 +43,9 @@ w1 = 0
 # active pressure, >0
 w2 = 30
 
-# mesh, v, vdx, vdy = settings.annulusInPeriodicSquare(order, maxh)
+mesh, v, vdx, vdy = settings.annulusInPeriodicSquare(order, maxh)
 # mesh, v, vdx, vdy = settings.annulus(order, maxh)
-mesh, v, vdx, vdy = settings.singleSawtooth(order, 2)
+# mesh, v, vdx, vdy = settings.singleSawtooth(order, 2)
 
 gradv = CoefficientFunction((vdx, vdy))
 
@@ -93,17 +96,17 @@ a = BilinearForm(fes)
 # equation for rho
 # TODO: boundary terms from partial integration?
 # TODO: separate terms which need to be reassembled at every time step
-# a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
-a += SymbolicBFI((vbar*W*grad(trho) - DT*grad(rho)*grad(trho)).Compile(True))
+a += SymbolicBFI(vbar*W*grad(trho) - DT*grad(rho)*grad(trho))
+# a += SymbolicBFI((vbar*W*grad(trho) - DT*grad(rho)*grad(trho)).Compile(True))
 # a += SymbolicBFI(-gradvbar*W*trho - vbar*divW*trho - DT*grad(rho)*grad(trho))
 
 # # equation for W
-# a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
-#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
-#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
-a += SymbolicBFI((0.5*vbar*rho*divtW - gamma1*W*tW
+a += SymbolicBFI(0.5*vbar*rho*divtW - gamma1*W*tW
                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
-                 -w1*WdotdelW*tW + w2*gradnormWsq*tW).Compile(True))
+                 -w1*WdotdelW*tW + w2*gradnormWsq*tW)
+# a += SymbolicBFI((0.5*vbar*rho*divtW - gamma1*W*tW
+#                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*divW*divtW
+#                  -w1*WdotdelW*tW + w2*gradnormWsq*tW).Compile(True))
 # a += SymbolicBFI(-0.5*(gradvbar*rho + vbar*grad(rho))*tW - gamma1*W*tW
 #                  -gamma2*(sqr(gWx)+sqr(gWy))*W*tW - k*gradWx*gradtWx - k*gradWy*gradtWy
 #                  -w1*WdotdelW*tW + w2*gradnormWsq*tW)
@@ -116,13 +119,13 @@ m.Assemble()
 rhs = g.vec.CreateVector()
 mstar = m.mat.CreateMatrix()
 
-pickin = pickle.Unpickler(open('sawtooth2d_8.dat', 'rb'))
-pickout = pickle.Pickler(open('sawtooth2d_9.dat', 'wb'))
-while True:
-    try:
-        g.vec.FV().NumPy()[:] = pickin.load().tolist()
-    except EOFError:
-        break
+# pickin = pickle.Unpickler(open('sawtooth2d_8.dat', 'rb'))
+# pickout = pickle.Pickler(open('sawtooth2d_9.dat', 'wb'))
+# while True:
+#     try:
+#         g.vec.FV().NumPy()[:] = pickin.load().tolist()
+#     except EOFError:
+#         break
 
 # # # g.vec.data = gp.vec
 # # # print(g.components[0].vec)
@@ -143,7 +146,7 @@ if vtkoutput:
     vtk.Do()
 
 input("Press any key...")
-t = 0.0
+t = 0
 with TaskManager():
     while tend < 0 or t < tend - tau / 2:
         print("\nt = {:10.6e}".format(t))
@@ -157,10 +160,14 @@ with TaskManager():
         invmat = mstar.Inverse(fes.FreeDofs())
         g.vec.data = invmat * rhs
 
-        pickout.dump(g.vec.FV().NumPy())
+        now = datetime.now()
+        if t % 10000 == 0:
+            pickle.dump(g.vec.FV().NumPy(), open('t={}_wall={:%H:%M}.dat'.format(t, now), 'wb'))
+
+        if now.hour > 7:
+            break
 
         Redraw(blocking=False)
-        # if t > 12:
-        #     input()
+
         if vtkoutput:
             vtk.Do()
