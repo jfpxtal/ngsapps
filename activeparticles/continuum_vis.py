@@ -17,8 +17,8 @@ vtkoutput = False
 
 # time step and end
 # tau = 0.01
-# tau = 0.5
-tau = 5
+tau = 0.5
+# tau = 5
 tend = -1
 
 # diffusion coefficient for rho
@@ -82,6 +82,7 @@ vbar = v * exp(-alpha*grho)
 gradvbar = gradv*exp(-alpha*grho) - alpha*grad(grho)*vbar
 WdotdelW = CoefficientFunction((gW*gradWx, gW*gradWy))
 gradnormWsq = 2*gWx*gradWx + 2*gWy*gradWy
+J = vbar*gW-DT*grad(grho)
 
 # initial values
 # grho.Set(exp(-sqr(x)-sqr(y)))
@@ -122,7 +123,7 @@ mstar = m.mat.CreateMatrix()
 
 t = 0
 
-path = './'
+path = 'data/vout0/'
 files = next(os.walk(path))[2]
 reg = re.compile('vout0_t=(\d+)_wall=\d+:\d+\.dat\Z')
 files = map(lambda f: (int(reg.search(f).group(1)), f), filter(reg.search, files))
@@ -130,41 +131,47 @@ files = sorted(files, key=lambda f: f[0])
 print(files)
 files = map(lambda f: (f[0], pickle.load(open(path+f[1], 'rb')).tolist()), files)
 
-t, g.vec.FV().NumPy()[:] = list(files)[-1]
-
 Draw(vdy, mesh, 'vdy')
 Draw(vdx, mesh, 'vdx')
 Draw(v, mesh, 'v')
 Draw(gW, mesh, 'W')
-Draw(vbar*gW-DT*grad(grho), mesh,'J')
+Draw(J, mesh,'J')
 Draw(grho, mesh, 'rho')
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2]],names=["rho", "Wx", "Wy"], filename="instab/instab",subdivision=3)
-    vtk.Do()
+    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2], J],names=['rho', 'Wx', 'Wy', 'J'], filename='long/long',subdivision=3)
 
-input("Press any key...")
-with TaskManager():
-    while tend < 0 or t < tend - tau / 2:
-        print("\nt = {:10.6e}".format(t))
-        t += tau
-        print('Assembling a...')
-        a.Assemble()
-        print('...done')
+for f in files:
+    print('t={}'.format(f[0]))
+    g.vec.FV().NumPy()[:] = f[1]
+    Redraw()
+    if vtkoutput:
+        vtk.Do()
+    input("Press any key...")
 
-        rhs.data = m.mat * g.vec
-        mstar.AsVector().data = m.mat.AsVector() - tau*a.mat.AsVector()
-        invmat = mstar.Inverse(fes.FreeDofs())
-        g.vec.data = invmat * rhs
 
-        now = datetime.now()
-        if t % 5000 == 0:
-            pickle.dump(g.vec.FV().NumPy(), open('vout0_t={}_wall={:%H:%M}.dat'.format(t, now), 'wb'))
+# input("Press any key...")
+# with TaskManager():
+#     while tend < 0 or t < tend - tau / 2:
+#         print("\nt = {:10.6e}".format(t))
+#         t += tau
+#         print('Assembling a...')
+#         a.Assemble()
+#         print('...done')
 
-        # if now.hour > 7:
-        #     break
+#         rhs.data = m.mat * g.vec
+#         mstar.AsVector().data = m.mat.AsVector() - tau*a.mat.AsVector()
+#         invmat = mstar.Inverse(fes.FreeDofs())
+#         g.vec.data = invmat * rhs
 
-        Redraw(blocking=False)
+#         now = datetime.now()
+#         if t % 5000 == 0:
+#             pickle.dump(g.vec.FV().NumPy(), open('t={}_wall={:%H:%M}.dat'.format(t, now), 'wb'))
 
-        if vtkoutput:
-            vtk.Do()
+#         # if now.hour > 7:
+#         #     break
+
+#         Redraw(blocking=False)
+
+#         if vtkoutput:
+#             vtk.Do()
