@@ -5,6 +5,9 @@ import settings
 import pickle
 from datetime import datetime
 import re, os
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
+from bisect import bisect_left
 
 ngsglobals.msg_level = 1
 
@@ -13,6 +16,7 @@ ngsglobals.msg_level = 1
 order = 3
 maxh = 7
 
+vtkoutput = True
 vtkoutput = False
 
 # time step and end
@@ -123,13 +127,19 @@ mstar = m.mat.CreateMatrix()
 
 t = 0
 
-path = 'data/vout0/'
+path = 'data/supp/'
+# path = 'data/vout0/'
+reg = re.compile('t=(\d+)_wall=\d+:\d+\.dat\Z')
+# reg = re.compile('vout0_t=(\d+)_wall=\d+:\d+\.dat\Z')
 files = next(os.walk(path))[2]
-reg = re.compile('vout0_t=(\d+)_wall=\d+:\d+\.dat\Z')
 files = map(lambda f: (int(reg.search(f).group(1)), f), filter(reg.search, files))
 files = sorted(files, key=lambda f: f[0])
+keys = [f[0] for f in files]
 print(files)
-files = map(lambda f: (f[0], pickle.load(open(path+f[1], 'rb')).tolist()), files)
+print(len(files))
+files = [pickle.load(open(path+f[1], 'rb')).tolist() for f in files]
+
+g.vec.FV().NumPy()[:] = files[-1]
 
 Draw(vdy, mesh, 'vdy')
 Draw(vdx, mesh, 'vdx')
@@ -139,15 +149,28 @@ Draw(J, mesh,'J')
 Draw(grho, mesh, 'rho')
 
 if vtkoutput:
-    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2], J],names=['rho', 'Wx', 'Wy', 'J'], filename='long/long',subdivision=3)
 
-for f in files:
-    print('t={}'.format(f[0]))
-    g.vec.FV().NumPy()[:] = f[1]
-    Redraw()
-    if vtkoutput:
+    vtk = MyVTKOutput(ma=mesh, coefs=[g.components[0], g.components[1], g.components[2], J],names=['rho', 'Wx', 'Wy', 'J'], filename='vout0/vout0',subdivision=3)
+
+    for t, f in zip(keys, files):
+        print('t={}'.format(t))
+        g.vec.FV().NumPy()[:] = f
+        Redraw()
         vtk.Do()
-    input("Press any key...")
+        # input("Press any key...")
+
+else:
+    sl_time = Slider(plt.gca(), "Time", 0, keys[-1])
+
+    def update(t):
+        kt = bisect_left(keys, t)
+        print(kt)
+        g.vec.FV().NumPy()[:] = files[kt]
+
+        Redraw(blocking=True)
+
+    sl_time.on_changed(update)
+    plt.show()
 
 
 # input("Press any key...")
