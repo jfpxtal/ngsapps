@@ -14,10 +14,48 @@
 
 using namespace ngfem;
 
-typedef shared_ptr<CoefficientFunction> PyCF;
+typedef CoefficientFunction CF;
+typedef shared_ptr<CF> PyCF;
 typedef shared_ptr<ngcomp::FESpace> PyFES;
 typedef shared_ptr<BilinearFormIntegrator> PyBFI;
-PyCF MakeCoefficient (py::object val);
+
+// copy & paste since it's no longer exported by ngfem
+PyCF MakeCoefficient (py::object val)
+{
+  py::extract<shared_ptr<CF>> ecf(val);
+  if (ecf.check()) return ecf();
+  
+  // a numpy.complex converts itself to a real, and prints a warning
+  // thus we check for it first
+  if (string(py::str(val.get_type())) == "<class 'numpy.complex128'>")
+    return make_shared<ConstantCoefficientFunctionC> (val.cast<Complex>());
+
+  if(py::CheckCast<double>(val))
+    return make_shared<ConstantCoefficientFunction> (val.cast<double>());
+  if(py::CheckCast<Complex>(val)) 
+    return make_shared<ConstantCoefficientFunctionC> (val.cast<Complex>());
+
+  if (py::isinstance<py::list>(val))
+    {
+      py::list el(val);
+      Array<shared_ptr<CoefficientFunction>> cflist(py::len(el));
+      for (int i : Range(cflist))
+        cflist[i] = MakeCoefficient(el[i]);
+      return MakeDomainWiseCoefficientFunction(move(cflist));
+    }
+
+  if (py::isinstance<py::tuple>(val))
+    {
+      py::tuple et(val);
+      Array<shared_ptr<CoefficientFunction>> cflist(py::len(et));
+      for (int i : Range(cflist))
+        cflist[i] = MakeCoefficient(et[i]);
+      return MakeVectorialCoefficientFunction(move(cflist));
+    }
+
+
+  throw Exception ("cannot make coefficient");
+}
 
 void ExportNgsAppsUtils(py::module &m)
 {

@@ -16,7 +16,7 @@ void LagrangeSegm::CalcShape (const IntegrationPoint & ip,
 }
 
 void LagrangeSegm::CalcDShape (const IntegrationPoint & ip,
-                                  SliceMatrix<> dshape) const
+                                  BareSliceMatrix<> dshape) const
 {
   AutoDiff<1> adx (ip(0), 0);
   Vector<AutoDiff<1> > shapearray(ndof);
@@ -72,7 +72,7 @@ void LagrangeTrig :: CalcShape (const IntegrationPoint & ip,
 }
 
 void LagrangeTrig::CalcDShape (const IntegrationPoint & ip,
-                                  SliceMatrix<> dshape) const
+                                  BareSliceMatrix<> dshape) const
 {
   AutoDiff<2> adx (ip(0), 0);
   AutoDiff<2> ady (ip(1), 1);
@@ -164,7 +164,7 @@ void LagrangeTet :: CalcShape (const IntegrationPoint & ip,
 }
 
 void LagrangeTet::CalcDShape (const IntegrationPoint & ip,
-                                  SliceMatrix<> dshape) const
+                                  BareSliceMatrix<> dshape) const
 {
   AutoDiff<3> adx (ip(0), 0);
   AutoDiff<3> ady (ip(1), 1);

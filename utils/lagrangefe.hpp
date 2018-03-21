@@ -18,7 +18,7 @@ namespace ngfem
                             BareSliceVector<> shape) const;
 
     virtual void CalcDShape(const IntegrationPoint & ip,
-                             SliceMatrix<> dshape) const;
+                             BareSliceMatrix<> dshape) const;
 
   private:
     template <class T>
@@ -39,7 +39,7 @@ namespace ngfem
                             BareSliceVector<> shape) const;
 
     virtual void CalcDShape(const IntegrationPoint & ip,
-                             SliceMatrix<> dshape) const;
+                             BareSliceMatrix<> dshape) const;
 
   private:
     template <class T>
@@ -60,7 +60,7 @@ namespace ngfem
                             BareSliceVector<> shape) const;
 
     virtual void CalcDShape(const IntegrationPoint & ip,
-                             SliceMatrix<> dshape) const;
+                             BareSliceMatrix<> dshape) const;
 
   private:
     template <class T>

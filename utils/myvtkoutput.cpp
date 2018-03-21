@@ -282,10 +282,7 @@ namespace ngcomp
   void MyVTKOutput<D>::Do(LocalHeap & lh, const BitArray * drawelems)
   {
     ostringstream filenamefinal;
-    filenamefinal << filename;
-    if (output_cnt > 0)
-      filenamefinal << "_" << output_cnt;
-    filenamefinal << ".vtk";
+    filenamefinal << filename << output_cnt << ".vtk";
     ofstream fileout(filenamefinal.str());
     cout << " Writing VTK-Output";
     if (output_cnt > 0)

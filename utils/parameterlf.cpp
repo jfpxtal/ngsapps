@@ -26,8 +26,8 @@ namespace ngfem
     const auto &paramCoords = static_cast<ParameterLFUserData*>(ir.GetTransformation().userdata)->paramCoords;
     for (int k = 0; k < ir.Size(); k++)
     {
-      auto x = ps.Get(k, 0) - paramCoords[0];
-      auto y = ps.Get(k, 1) - paramCoords[1];
+      auto x = ps(k, 0) - paramCoords[0];
+      auto y = ps(k, 1) - paramCoords[1];
       auto d =  FMA(-1/radius, sqrt(x*x+y*y), 1);
       values(0, k) = scale*ngstd::IfPos(d, d, 0);
     }
@@ -227,7 +227,7 @@ namespace ngfem
           {
             elvec = 0;
             for (auto l : Range(fes->GetSpacialDimension()))
-              ud.paramCoords(l) = points.Get(j, l)[m];
+              ud.paramCoords(l) = points(j, l)[m];
 
             for (auto proxy : proxies)
             {

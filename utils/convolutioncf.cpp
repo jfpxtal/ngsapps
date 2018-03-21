@@ -254,7 +254,7 @@ namespace ngfem
             for (auto k : Range(ir.Size()))
             {
               for (auto l : Range(ir.DimSpace()))
-                newBMIR->GetPoints().Get(j*SIMD<IntegrationPoint>::Size()*ir.Size()+m*ir.Size()+k, l) = points.Get(k, l) - mirpts.Get(j, l)[m];
+                newBMIR->GetPoints()(j*SIMD<IntegrationPoint>::Size()*ir.Size()+m*ir.Size()+k, l) = points(k, l) - mirpts(j, l)[m];
             }
           }
         }
